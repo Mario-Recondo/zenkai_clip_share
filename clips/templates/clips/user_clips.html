@@ -1,13 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>{{ user_object.username }}'s Clips</title>
-</head>
-<body>
+{% extends 'base.html' %}
+
+{% block content %}
     <h1>{{ user_object.username }}'s Clips</h1>
     <p>A gallery of all the clips uploaded by this user.</p>
     <hr>
@@ -22,15 +15,13 @@
                 <video controls width="500">
                     <source src="{{ clip.converted_video_file.url }}" type="video/mp4">
                     Your browser does not support this video tag.
-                    </video>
-                {% else %}
-            <p>Video is currently processing...</p>
+                </video>
+            {% else %}
+                <p>Video is currently processing...</p>
             {% endif %}
             <br><br>
         </article>
     {% empty %}
         <p>{{ user_object.username }} has not uploaded any clips yet.</p>
-    {%  endfor %}
-
-</body>
-</html>
+    {% endfor %}
+{% endblock %}

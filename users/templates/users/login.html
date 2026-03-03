@@ -1,22 +1,15 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Login</title>
-</head>
-<body>
+{% extends 'base.html' %}
+
+{% block header %}{% endblock %}
+
+{% block content %}
     <h2>Login</h2>
     <form method="post">
-        {% csrf_token %} {# Django security token for forms}
-        {{ form.as_p }} {# Renders the form field as paragraphs}
+        {% csrf_token %}
+        {{ form.as_p }}
         <button type="submit">Login</button>
     </form>
     <small class="text-muted">
-        Need an account? <a href="{% url 'register' %}">Sign Up Now</a> {# to be linked later}
+        Need an account? <a href="{% url 'register' %}">Sign Up Now</a>
     </small>
-
-</body>
-</html>
+{% endblock %}

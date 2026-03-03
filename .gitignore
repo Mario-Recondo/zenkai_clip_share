@@ -12,7 +12,8 @@ venv/
 
 # Django specific
 db.sqlite3
-media/  # Ignore the entire media directory
+# Ignore the entire media directory
+media/
 /static_collected/ # Directory for collected static files in production
 *.log
 local_settings.py # If you create a local settings file for sensitive info
