@@ -2,8 +2,9 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 
 from clips.views import user_clips
-from .forms import UserRegistrationForm, ProfileUpdateForm, UserUpdateForm
 from clips.models import Clip
+from .forms import UserRegistrationForm, ProfileUpdateForm, UserUpdateForm
+from .models import Profile
 
 
 # Create views here.
@@ -35,9 +36,12 @@ def register(request):
 
 @login_required
 def profile(request):
+    # Ensure the user always has a Profile instance
+    profile_obj, _ = Profile.objects.get_or_create(user=request.user)
+
     if request.method == 'POST':
         u_form = UserUpdateForm(request.POST, instance=request.user)
-        p_form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user.profile)
+        p_form = ProfileUpdateForm(request.POST, request.FILES, instance=profile_obj)
 
         if u_form.is_valid() and p_form.is_valid():
             u_form.save()
@@ -47,11 +51,11 @@ def profile(request):
     else:
         #  for GET request, creates form instance with existing data
         u_form = UserUpdateForm(instance=request.user)
-        p_form = ProfileUpdateForm(instance=request.user.profile)
+        p_form = ProfileUpdateForm(instance=profile_obj)
 
     context = {
         'u_form': u_form,
         'p_form': p_form,
     }
-    return render(request, 'users/profile.html',context)
+    return render(request, 'users/profile.html', context)
 
