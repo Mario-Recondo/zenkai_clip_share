@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 *.env
 .idea/  # PyCharm project files (optional, but often good to ignore if others use different IDEs)
 
