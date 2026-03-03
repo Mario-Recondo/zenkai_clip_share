@@ -8,12 +8,13 @@
     {% if title %}
         <title>{{ title }} - Zenkai Clips</title>
     {% else %}
-        <<TITLE>Zenkai Clips</TITLE>
+        <title>Zenkai Clips</title>
     {% endif %}
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
+    {% block header %}
     <header>
         <nav>
             <a href="{% url 'clip-list' %}">Home</a>
@@ -31,10 +32,11 @@
             {% endif %}
         </nav>
     </header>
+    {% endblock %}
 
     <main>
         {% block content %}
         {% endblock %}
     </main>
 </body>
-</html>>
+</html>

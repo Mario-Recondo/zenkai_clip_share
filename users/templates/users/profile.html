@@ -1,16 +1,7 @@
 {% extends 'base.html' %}
 
-<!doctype html>
-<html lang="en">
-<head>
 {% block content %}
-    <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-    <title>{{user.username}}'s Profile</title>
-</head>
-<body>
-    <h2>{{user.username}}'s Profile</h2>
+    <h2>{{ user.username }}'s Profile</h2>
     {% if user.profile.profile_picture %}
         <img src="{{ user.profile.profile_picture.url }}" alt="Profile Picture" width="150" height="150">
     {% endif %}
@@ -38,7 +29,3 @@
         <button type="submit">Logout</button>
     </form>
 {% endblock %}
-
-
-</body>
-</html>>
