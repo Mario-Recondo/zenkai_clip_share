@@ -14,7 +14,8 @@ from django.contrib.auth.decorators import login_required
 def clip_list(request):
     clips = Clip.objects.all().order_by('date_uploaded')
     context = {
-        'clips': clips
+        'clips': clips,
+        'title': 'Recent Clips',
     }
     return render(request, 'clips/clip_list.html', context)
 
@@ -24,6 +25,11 @@ class ClipCreateView(LoginRequiredMixin, CreateView):
     form_class = ClipCreateForm
     template_name = 'clips/clip_create.html'
     success_url = reverse_lazy('clip-list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Upload a Clip'
+        return context
 
     def form_valid(self, form):
         form.instance.uploader = self.request.user
@@ -35,6 +41,7 @@ def user_clips(request, username):
     clips = Clip.objects.filter(uploader=user).order_by('-date_uploaded')
     context = {
         'user_object': user,
-        'clips': clips
+        'clips': clips,
+        'title': f"{user.username}'s Clips",
     }
     return render(request, 'clips/user_clips.html', context)
