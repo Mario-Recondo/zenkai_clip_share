@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import LoginView, LogoutView
 
-from clips.views import user_clips
 from clips.models import Clip
 from .forms import UserRegistrationForm, ProfileUpdateForm, UserUpdateForm
 from .models import Profile
@@ -12,7 +12,8 @@ from .models import Profile
 def dashboard(request):
     user_clips = Clip.objects.filter(uploader=request.user).order_by('-date_uploaded')
     context = {
-        'clips': user_clips
+        'clips': user_clips,
+        'title': 'Dashboard',
     }
     # user object is available in the template automatically if users can access this view
     return render(request, 'users/dashboard.html', context)
@@ -31,7 +32,7 @@ def register(request):
     else:
         # if request is a GET then I need to display an empty form
         form = UserRegistrationForm()
-    return render(request, 'users/register.html', {'form': form})
+    return render(request, 'users/register.html', {'form': form, 'title': 'Register'})
 
 
 @login_required
@@ -56,6 +57,26 @@ def profile(request):
     context = {
         'u_form': u_form,
         'p_form': p_form,
+        'title': f"{request.user.username}'s Profile",
     }
     return render(request, 'users/profile.html', context)
+
+
+class CustomLoginView(LoginView):
+    template_name = 'users/login.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Login'
+        return context
+
+
+class CustomLogoutView(LogoutView):
+    template_name = 'users/logout.html'
+    next_page = 'login'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Logged Out'
+        return context
 
