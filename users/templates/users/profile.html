@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h2>{{ user.username }}'s Profile</h2>
+    <h1>{{ user.username }}'s Profile</h1>
     {% if user.profile.profile_picture %}
         <img src="{{ user.profile.profile_picture.url }}" alt="Profile Picture" width="150" height="150">
     {% endif %}
@@ -9,7 +9,7 @@
 
     <p><a href="{% url 'dashboard' %}">View My Dashboard</a></p>
 
-    <h3>Update Profile</h3>
+    <h2>Update Profile</h2>
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <fieldset>
