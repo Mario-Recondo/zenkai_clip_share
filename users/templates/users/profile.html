@@ -13,10 +13,6 @@
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <fieldset>
-            <legend>User Info</legend>
-            {{ u_form.as_p }}
-        </fieldset>
-        <fieldset>
             <legend>Profile Info</legend>
             {{ p_form.as_p }}
         </fieldset>

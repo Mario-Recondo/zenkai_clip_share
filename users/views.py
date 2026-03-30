@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 
 from clips.models import Clip
-from .forms import UserRegistrationForm, ProfileUpdateForm, UserUpdateForm
+from .forms import UserRegistrationForm, ProfileUpdateForm
 from .models import Profile
 
 
@@ -41,21 +41,16 @@ def profile(request):
     profile_obj, _ = Profile.objects.get_or_create(user=request.user)
 
     if request.method == 'POST':
-        u_form = UserUpdateForm(request.POST, instance=request.user)
         p_form = ProfileUpdateForm(request.POST, request.FILES, instance=profile_obj)
 
-        if u_form.is_valid() and p_form.is_valid():
-            u_form.save()
+        if p_form.is_valid():
             p_form.save()
             return redirect('profile')
 
     else:
-        #  for GET request, creates form instance with existing data
-        u_form = UserUpdateForm(instance=request.user)
         p_form = ProfileUpdateForm(instance=profile_obj)
 
     context = {
-        'u_form': u_form,
         'p_form': p_form,
         'title': f"{request.user.username}'s Profile",
     }
