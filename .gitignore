@@ -8,11 +8,6 @@ env/
 venv/
 .venv/
 *.env
-# Local secrets (never commit)
-.env
-.env.local
-.env.*.local
-
 .idea/  # PyCharm project files (optional, but often good to ignore if others use different IDEs)
 
 # Django specific

@@ -10,11 +10,10 @@
             <p>Uploader: {{ clip.uploader.username }}</p>
             <p>Date: {{ clip.date_uploaded }}</p>
             <p>{{ clip.description }}</p>
-            <video controls width="500">
-                <source src="{{ clip.video_file.url }}" type="video/mp4">
-                Your browser does not support the video tag.
-            </video>
+            {% include "clips/includes/clip_player.html" %}
             <br><br>
         </article>
+    {% empty %}
+        <p>No clips have been uploaded yet.</p>
     {% endfor %}
 {% endblock %}

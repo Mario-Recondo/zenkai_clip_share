@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 # Create your views here.
 @login_required
 def clip_list(request):
-    clips = Clip.objects.all().order_by('date_uploaded')
+    clips = Clip.objects.all().order_by('-date_uploaded')
     context = {
         'clips': clips,
         'title': 'Recent Clips',

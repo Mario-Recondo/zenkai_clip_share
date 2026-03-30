@@ -11,14 +11,7 @@
             <p>Uploader: {{ clip.uploader.username }}</p>
             <p>Date: {{ clip.date_uploaded }}</p>
             <p>{{ clip.description }}</p>
-            {% if clip.converted_video_file %}
-                <video controls width="500">
-                    <source src="{{ clip.converted_video_file.url }}" type="video/mp4">
-                    Your browser does not support this video tag.
-                </video>
-            {% else %}
-                <p>Video is currently processing...</p>
-            {% endif %}
+            {% include "clips/includes/clip_player.html" %}
             <br><br>
         </article>
     {% empty %}
