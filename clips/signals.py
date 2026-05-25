@@ -1,11 +1,10 @@
-import subprocess
-from fileinput import filename
+import os
+
 import ffmpeg
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-import os
-from django.conf import settings
-from ffmpeg import output, overwrite_output
+
 from .models import Clip
 
 

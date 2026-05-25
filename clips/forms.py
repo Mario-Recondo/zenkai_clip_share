@@ -1,6 +1,5 @@
-from symtable import Class
-
 from django import forms
+
 from .models import Clip
 
 
