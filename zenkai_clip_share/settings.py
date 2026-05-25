@@ -127,7 +127,7 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGIN_REDIRECT_URL = 'dashboard' # Redirects to the 'dashboard' URL name after login
+LOGIN_REDIRECT_URL = 'clip-list'
 
 LOGIN_URL = 'login'
 
