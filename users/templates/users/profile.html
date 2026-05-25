@@ -7,7 +7,7 @@
     {% endif %}
     <p>Bio: {{ user.profile.bio|default:"None" }}</p>
 
-    <p><a href="{% url 'dashboard' %}">View My Dashboard</a></p>
+    <p><a href="{% url 'user-clips' user.username %}">View My Clips</a></p>
 
     <h2>Update Profile</h2>
     <form method="post" enctype="multipart/form-data">
@@ -19,7 +19,7 @@
         <button type="submit">Update</button>
     </form>
 
-    <p><a href="{% url 'dashboard' %}">Back to Dashboard</a></p>
+    <p><a href="{% url 'clip-list' %}">Back to Home</a></p>
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
         <button type="submit">Logout</button>
