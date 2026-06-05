@@ -1,20 +1,27 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView
 
 from .forms import ClipCreateForm
 from .models import Clip
+from .services import enqueue_transcode
+
+PAGE_SIZE = 12
 
 
 # Create your views here.
 @login_required
 def clip_list(request):
-    clips = Clip.objects.all().order_by('-date_uploaded')
+    # select_related avoids an N+1 on clip.uploader.username (Flaw #4)
+    clip_qs = Clip.objects.select_related('uploader').order_by('-date_uploaded')
+    page_obj = Paginator(clip_qs, PAGE_SIZE).get_page(request.GET.get('page'))
     context = {
-        'clips': clips,
+        'clips': page_obj,
+        'page_obj': page_obj,
         'title': 'Recent Clips',
     }
     return render(request, 'clips/clip_list.html', context)
@@ -33,15 +40,24 @@ class ClipCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.uploader = self.request.user
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        # Hand transcoding off to the worker instead of blocking the request (Flaw #1)
+        enqueue_transcode(self.object)
+        return response
 
 # view to display a single users clips
 def user_clips(request, username):
     user = get_object_or_404(User, username=username)
-    clips = Clip.objects.filter(uploader=user).order_by('-date_uploaded')
+    clip_qs = (
+        Clip.objects.filter(uploader=user)
+        .select_related('uploader')
+        .order_by('-date_uploaded')
+    )
+    page_obj = Paginator(clip_qs, PAGE_SIZE).get_page(request.GET.get('page'))
     context = {
         'user_object': user,
-        'clips': clips,
+        'clips': page_obj,
+        'page_obj': page_obj,
         'title': f"{user.username}'s Clips",
     }
     return render(request, 'clips/user_clips.html', context)

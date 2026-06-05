@@ -12,20 +12,31 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 
+import environ
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# 12-factor configuration (Flaw #2): everything environment-specific is read from
+# the environment / a local .env file. See .env.example for the full list.
+env = environ.Env(
+    DEBUG=(bool, False),
+)
+environ.Env.read_env(BASE_DIR / '.env')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-2-!awc^xw&98#!8s4w&9pe5^)3l44a54$yfbrl^f86p34y3q#l'
+# SECURITY WARNING: keep the secret key secret. In production this MUST come from
+# the environment. The old hardcoded key was committed to git and is compromised —
+# rotate it (generate a fresh one) before any real deployment.
+SECRET_KEY = env(
+    'SECRET_KEY',
+    default='django-insecure-dev-only-do-not-use-in-production',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 
 # Application definition
@@ -39,6 +50,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'users.apps.UsersConfig',
     'clips',
+    'django_q',
+    'storages',
 ]
 
 MIDDLEWARE = [
@@ -75,11 +88,14 @@ WSGI_APPLICATION = 'zenkai_clip_share.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Dev defaults to SQLite; production sets DATABASE_URL (e.g. a Postgres URL on the
+# Oracle box). Postgres is required in production because the web tier and the
+# django-q2 worker write concurrently and SQLite's single-writer lock can't take it.
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.db(
+        'DATABASE_URL',
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+    )
 }
 
 
@@ -131,5 +147,90 @@ LOGIN_REDIRECT_URL = 'clip-list'
 
 LOGIN_URL = 'login'
 
-MEDIA_ROOT = BASE_DIR / 'media'  # path to media directory, sets the default location where media is saved
+MEDIA_ROOT = BASE_DIR / 'media'  # local-FS fallback when object storage is disabled
 MEDIA_URL = '/media/'
+
+
+# ---------------------------------------------------------------------------
+# Object storage (Flaw #3)
+# ---------------------------------------------------------------------------
+# When USE_S3 is true, all media (raw uploads + transcoded output) is stored in
+# an S3-compatible bucket — Cloudflare R2 in the recommended free setup. R2 speaks
+# the S3 API, so the only difference from AWS S3 is the endpoint URL. All web and
+# worker instances then share the same media, and Django never serves video bytes.
+USE_S3 = env.bool('USE_S3', default=False)
+
+if USE_S3:
+    AWS_ACCESS_KEY_ID = env('R2_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = env('R2_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = env('R2_BUCKET_NAME')
+    AWS_S3_ENDPOINT_URL = env('R2_ENDPOINT_URL')  # https://<accountid>.r2.cloudflarestorage.com
+    # Public domain that serves the bucket (an R2 custom domain fronted by the
+    # Cloudflare CDN). <video> tags point here, not at Django.
+    AWS_S3_CUSTOM_DOMAIN = env('R2_PUBLIC_DOMAIN', default=None)
+    AWS_S3_REGION_NAME = 'auto'
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False  # serve converted clips via plain public URLs
+    AWS_S3_FILE_OVERWRITE = False
+    STORAGES = {
+        'default': {'BACKEND': 'storages.backends.s3.S3Storage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    }
+else:
+    STORAGES = {
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Async task queue (Flaw #1)
+# ---------------------------------------------------------------------------
+# django-q2 with the ORM broker: the Postgres/SQLite database doubles as the
+# message broker, so there is no Redis/RabbitMQ to run. Transcoding is dispatched
+# to a separate `qcluster` worker process and never blocks the web request.
+Q_CLUSTER = {
+    'name': 'zenkai',
+    'workers': env.int('Q_WORKERS', default=2),
+    'timeout': 600,   # hard cap per task (s); a 90s clip transcodes well under this
+    'retry': 900,     # must be > timeout
+    'max_attempts': 2,
+    'orm': 'default',
+    'catch_up': False,
+    'label': 'Task Queue',
+}
+
+
+# ---------------------------------------------------------------------------
+# Logging (Flaw #11) — transcode failures go to the log, not print()
+# ---------------------------------------------------------------------------
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'standard'},
+    },
+    'root': {'handlers': ['console'], 'level': 'INFO'},
+    'loggers': {
+        'clips': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Production security (Flaw #2) — only enforced when DEBUG is off
+# ---------------------------------------------------------------------------
+if not DEBUG:
+    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    # Oracle box sits behind nginx/Cloudflare doing TLS termination
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

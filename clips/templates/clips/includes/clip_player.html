@@ -1,8 +1,10 @@
-{% if clip.converted_video_file %}
+{% if clip.status == 'READY' and clip.converted_video_file %}
     <video controls width="500">
         <source src="{{ clip.converted_video_file.url }}" type="video/mp4">
         Your browser does not support this video tag.
     </video>
+{% elif clip.status == 'FAILED' %}
+    <p>⚠ This clip could not be processed.</p>
 {% else %}
-    <p>Video is currently processing...</p>
+    <p>Video is currently processing…</p>
 {% endif %}

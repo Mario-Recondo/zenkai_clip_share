@@ -1,0 +1,22 @@
+# Core
+Django==6.0.3
+
+# Media processing (calls the ffmpeg binary, which must be installed on the host)
+ffmpeg-python==0.2.0
+Pillow==12.1.1
+
+# Async task queue (Flaw #1). django-q2 uses the Django ORM as its broker,
+# so no Redis/RabbitMQ is required.
+django-q2==1.8.0
+
+# Object storage (Flaw #3). django-storages speaks the S3 API, which
+# Cloudflare R2 / AWS S3 / MinIO all implement.
+django-storages==1.14.6
+boto3==1.40.0
+
+# 12-factor configuration (Flaw #2)
+django-environ==0.12.0
+
+# Production server + Postgres driver (used on the Oracle box; dev stays on SQLite)
+gunicorn==23.0.0
+psycopg[binary]==3.2.10

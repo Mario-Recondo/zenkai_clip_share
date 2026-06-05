@@ -17,3 +17,7 @@ media/
 /static_collected/ # Directory for collected static files in production
 *.log
 local_settings.py # If you create a local settings file for sensitive info
+
+# Internal planning / review docs — keep local, don't publish
+architecture_flaws.md
+oracle_implementation.md

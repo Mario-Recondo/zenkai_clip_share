@@ -17,4 +17,6 @@
     {% empty %}
         <p>{{ user_object.username }} has not uploaded any clips yet.</p>
     {% endfor %}
+
+    {% include "clips/includes/pagination.html" %}
 {% endblock %}
