@@ -1,10 +1,18 @@
 {% if clip.status == 'READY' and clip.converted_video_file %}
-    <video controls width="500">
+    <video controls preload="metadata" class="aspect-video w-full rounded-lg bg-black">
         <source src="{{ clip.converted_video_file.url }}" type="video/mp4">
         Your browser does not support this video tag.
     </video>
 {% elif clip.status == 'FAILED' %}
-    <p>⚠ This clip could not be processed.</p>
+    <div class="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-lg border border-red-900/60 bg-red-950/30">
+        <svg class="size-7 text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+        <p class="text-sm text-red-300">This clip could not be processed.</p>
+    </div>
 {% else %}
-    <p>Video is currently processing…</p>
+    <div class="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-lg border border-ink-700 bg-ink-900">
+        <div class="size-8 animate-spin rounded-full border-2 border-ink-600 border-t-ember-500" aria-hidden="true"></div>
+        <p class="text-sm text-ink-400">Processing your clip…</p>
+    </div>
 {% endif %}

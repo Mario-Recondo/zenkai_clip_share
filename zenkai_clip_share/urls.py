@@ -14,13 +14,16 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+import re
+
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 
 from users.views import CustomLoginView, CustomLogoutView
 from django.conf import settings
-from django.conf.urls.static import static
 from django.views.generic.base import RedirectView
+
+from .dev_media import ranged_serve
 
 urlpatterns = [
     path('', RedirectView.as_view(url='clips/home/', permanent=True)),
@@ -35,5 +38,13 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Range-aware replacement for django.conf.urls.static.static() so video
+    # timeline seeking works against the dev server (see dev_media.py).
+    urlpatterns += [
+        re_path(
+            r'^%s(?P<path>.*)$' % re.escape(settings.MEDIA_URL.lstrip('/')),
+            ranged_serve,
+            {'document_root': settings.MEDIA_ROOT},
+        ),
+    ]
 

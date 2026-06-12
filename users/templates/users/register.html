@@ -3,13 +3,22 @@
 {% block header %}{% endblock %}
 
 {% block content %}
-    <h1>Join Today</h1>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Sign Up</button>
-    </form>
-    <small class="text-muted">
-        Already Have An Account? <a href="{% url 'login' %}">Sign In</a>
-    </small>
+    <div class="mx-auto mt-10 max-w-sm">
+        <p class="text-center text-2xl font-bold tracking-tight">
+            Zenkai<span class="text-ember-500">Clips</span>
+        </p>
+
+        <div class="card mt-6 p-6">
+            <h1 class="text-center text-xl font-semibold tracking-tight">Create your account</h1>
+            <form method="post" class="form-stack mt-6">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary w-full">Sign up</button>
+            </form>
+        </div>
+
+        <p class="mt-4 text-center text-sm text-ink-400">
+            Already have an account? <a href="{% url 'login' %}" class="font-medium text-ember-400 transition-colors hover:text-ember-300">Sign in</a>
+        </p>
+    </div>
 {% endblock %}

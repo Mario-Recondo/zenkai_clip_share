@@ -1,0 +1,116 @@
+/*
+ * Tailwind source for Zenkai Clips.
+ * Build with the standalone CLI (see README "Frontend build"):
+ *   .bin/tailwindcss.exe -i static_src/input.css -o static/css/style.css --watch
+ */
+@import "tailwindcss" source(none);
+
+@source "../templates";
+@source "../clips/templates";
+@source "../users/templates";
+
+@theme {
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+        Roboto, Arial, sans-serif;
+
+    /* Surfaces & text — cool near-black scale ("ink") */
+    --color-ink-950: #0b0b0d; /* page background */
+    --color-ink-900: #121215; /* panels / processing placeholders */
+    --color-ink-850: #17171b; /* cards */
+    --color-ink-800: #1d1d22; /* inputs / elevated surfaces */
+    --color-ink-700: #28282f; /* borders */
+    --color-ink-600: #3a3a44; /* strong borders / hover */
+    --color-ink-400: #8b8b96; /* muted text */
+    --color-ink-300: #b4b4bd; /* secondary text */
+    --color-ink-100: #ececef; /* primary text */
+
+    /* Accent — desaturated "ember" orange (Zenkai boost, not traffic cone) */
+    --color-ember-300: #f2b27c;
+    --color-ember-400: #e9964f;
+    --color-ember-500: #de7f33;
+    --color-ember-600: #c0661f;
+    --color-ember-700: #98511b;
+}
+
+@layer components {
+    .btn {
+        @apply inline-flex cursor-pointer items-center justify-center gap-2
+            rounded-lg px-4 py-2 text-sm font-medium transition-colors
+            focus-visible:outline-2 focus-visible:outline-offset-2
+            focus-visible:outline-ember-500 disabled:pointer-events-none
+            disabled:opacity-50;
+    }
+
+    .btn-primary {
+        @apply bg-ember-600 text-white hover:bg-ember-500;
+    }
+
+    .btn-secondary {
+        @apply border border-ink-700 bg-ink-800 text-ink-100 hover:border-ink-600
+            hover:bg-ink-700;
+    }
+
+    .btn-ghost {
+        @apply text-ink-300 hover:bg-ink-800 hover:text-ink-100;
+    }
+
+    .card {
+        @apply rounded-xl border border-ink-700 bg-ink-850;
+    }
+
+    /*
+     * Form styling for Django's `{{ form.as_p }}` output: wrap the form in
+     * .form-stack and the <p>/<label>/<input>/.helptext/.errorlist markup
+     * Django emits gets styled without per-widget attrs in Python.
+     */
+    .form-stack p {
+        @apply mb-5;
+    }
+
+    .form-stack label {
+        @apply mb-1.5 block text-sm font-medium text-ink-300;
+    }
+
+    .form-stack input[type="text"],
+    .form-stack input[type="email"],
+    .form-stack input[type="password"],
+    .form-stack input[type="url"],
+    .form-stack input[type="number"],
+    .form-stack textarea,
+    .form-stack select {
+        @apply w-full rounded-lg border border-ink-700 bg-ink-800 px-3.5 py-2.5
+            text-sm text-ink-100 transition-colors placeholder:text-ink-400
+            focus:border-ember-500 focus:ring-1 focus:ring-ember-500
+            focus:outline-none;
+    }
+
+    .form-stack textarea {
+        @apply min-h-24;
+    }
+
+    .form-stack input[type="file"] {
+        @apply w-full cursor-pointer rounded-lg border border-dashed
+            border-ink-600 bg-ink-900 p-3 text-sm text-ink-300;
+    }
+
+    .form-stack input[type="file"]::file-selector-button {
+        @apply mr-4 cursor-pointer rounded-md border-0 bg-ink-700 px-3 py-1.5
+            text-sm font-medium text-ink-100;
+    }
+
+    .form-stack input[type="checkbox"] {
+        @apply size-4 accent-ember-500;
+    }
+
+    .form-stack .helptext {
+        @apply mt-1.5 block text-xs leading-relaxed text-ink-400;
+    }
+
+    .form-stack .helptext ul {
+        @apply mt-1 list-disc space-y-0.5 pl-4;
+    }
+
+    .errorlist {
+        @apply mb-2 list-none space-y-1 text-sm text-red-400;
+    }
+}

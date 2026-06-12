@@ -1,21 +1,22 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>Recent Clips</h1>
-    <hr>
+    <div class="mx-auto max-w-3xl">
+        <h1 class="text-2xl font-bold tracking-tight">Recent Clips</h1>
+        <p class="mt-1 text-sm text-ink-400">The latest plays from the community.</p>
 
-    {% for clip in clips %}
-        <article>
-            <h2>{{ clip.title }}</h2>
-            <p>Uploader: {{ clip.uploader.username }}</p>
-            <p>Date: {{ clip.date_uploaded }}</p>
-            <p>{{ clip.description }}</p>
-            {% include "clips/includes/clip_player.html" %}
-            <br><br>
-        </article>
-    {% empty %}
-        <p>No clips have been uploaded yet.</p>
-    {% endfor %}
+        <div class="mt-6 space-y-6">
+            {% for clip in clips %}
+                {% include "clips/includes/clip_card.html" %}
+            {% empty %}
+                <div class="card flex flex-col items-center gap-2 px-6 py-16 text-center">
+                    <p class="font-medium text-ink-300">No clips yet</p>
+                    <p class="text-sm text-ink-400">Be the first to share a play.</p>
+                    <a href="{% url 'clip-create' %}" class="btn btn-primary mt-3">Upload a clip</a>
+                </div>
+            {% endfor %}
+        </div>
 
-    {% include "clips/includes/pagination.html" %}
+        {% include "clips/includes/pagination.html" %}
+    </div>
 {% endblock %}
