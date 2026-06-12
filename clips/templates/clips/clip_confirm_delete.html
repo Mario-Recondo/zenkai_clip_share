@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="mx-auto max-w-md">
+        <div class="card p-6">
+            <h1 class="text-xl font-semibold tracking-tight">Delete this clip?</h1>
+            <p class="mt-2 text-sm text-ink-400">
+                &ldquo;{{ clip.title }}&rdquo; and its video files will be permanently deleted.
+                This cannot be undone.
+            </p>
+            {% if clip.thumbnail %}
+                <img src="{{ clip.thumbnail.url }}" alt="" class="mt-4 aspect-video w-full rounded-lg border border-ink-700 object-cover">
+            {% endif %}
+            <form method="post" class="mt-6 flex gap-3">
+                {% csrf_token %}
+                <a href="{% url 'clip-detail' clip.pk %}" class="btn btn-secondary flex-1">Cancel</a>
+                <button type="submit" class="btn btn-danger flex-1">Delete clip</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}

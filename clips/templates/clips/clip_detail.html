@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+    {% if clip.status == 'READY' and clip.converted_video_file %}
+        <link rel="stylesheet" href="{% static 'vendor/plyr/plyr.css' %}">
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="mx-auto max-w-4xl">
+        {% include "clips/includes/clip_player.html" %}
+
+        <div class="mt-5">
+            <h1 class="text-2xl font-bold tracking-tight">{{ clip.title }}</h1>
+            <div class="mt-3 flex items-center gap-3">
+                {% if clip.uploader.profile.profile_picture %}
+                    <img src="{{ clip.uploader.profile.profile_picture.url }}" alt="" class="size-10 rounded-full object-cover">
+                {% else %}
+                    <div class="flex size-10 items-center justify-center rounded-full bg-ink-700 font-bold uppercase text-ink-300" aria-hidden="true">{{ clip.uploader.username|first }}</div>
+                {% endif %}
+                <div>
+                    <a href="{% url 'user-clips' clip.uploader.username %}" class="font-medium transition-colors hover:text-ember-400">{{ clip.uploader.username }}</a>
+                    <p class="text-sm text-ink-400">{{ clip.date_uploaded|date:"M j, Y" }}</p>
+                </div>
+                {% if user == clip.uploader %}
+                    <a href="{% url 'clip-delete' clip.pk %}" class="btn btn-danger ml-auto">Delete</a>
+                {% endif %}
+            </div>
+            {% if clip.description %}
+                <p class="mt-5 rounded-xl border border-ink-700 bg-ink-850 p-4 text-sm leading-relaxed text-ink-300">{{ clip.description }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if clip.status == 'READY' and clip.converted_video_file %}
+        <script src="{% static 'vendor/plyr/plyr.js' %}"></script>
+        <script>
+            new Plyr('.js-player', {
+                iconUrl: "{% static 'vendor/plyr/plyr.svg' %}",
+                controls: ['play-large', 'play', 'progress', 'current-time', 'duration',
+                           'mute', 'volume', 'settings', 'pip', 'fullscreen'],
+                settings: ['speed'],
+            });
+        </script>
+    {% endif %}
+{% endblock %}
