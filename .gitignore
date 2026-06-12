@@ -8,16 +8,26 @@ env/
 venv/
 .venv/
 *.env
-.idea/  # PyCharm project files (optional, but often good to ignore if others use different IDEs)
+# PyCharm project files
+.idea/
+
+# Local tool binaries (standalone Tailwind CLI)
+.bin/
 
 # Django specific
 db.sqlite3
 # Ignore the entire media directory
 media/
-/static_collected/ # Directory for collected static files in production
+# Directory for collected static files in production
+/static_collected/
 *.log
-local_settings.py # If you create a local settings file for sensitive info
+# If you create a local settings file for sensitive info
+local_settings.py
+
+# Claude Code local config and skills
+.claude/
 
 # Internal planning / review docs — keep local, don't publish
 architecture_flaws.md
 oracle_implementation.md
+last_session.md

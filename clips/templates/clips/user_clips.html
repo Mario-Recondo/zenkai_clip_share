@@ -1,22 +1,29 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>{{ user_object.username }}'s Clips</h1>
-    <p>A gallery of all the clips uploaded by this user.</p>
-    <hr>
+    <div class="mx-auto max-w-3xl">
+        <div class="flex items-center gap-4">
+            {% if user_object.profile.profile_picture %}
+                <img src="{{ user_object.profile.profile_picture.url }}" alt="" class="size-14 rounded-full object-cover">
+            {% else %}
+                <div class="flex size-14 items-center justify-center rounded-full bg-ink-700 text-xl font-bold uppercase text-ink-300" aria-hidden="true">{{ user_object.username|first }}</div>
+            {% endif %}
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">{{ user_object.username }}'s Clips</h1>
+                <p class="mt-0.5 text-sm text-ink-400">{{ page_obj.paginator.count }} clip{{ page_obj.paginator.count|pluralize }}</p>
+            </div>
+        </div>
 
-    {% for clip in clips %}
-        <article>
-            <h2>{{ clip.title }}</h2>
-            <p>Uploader: {{ clip.uploader.username }}</p>
-            <p>Date: {{ clip.date_uploaded }}</p>
-            <p>{{ clip.description }}</p>
-            {% include "clips/includes/clip_player.html" %}
-            <br><br>
-        </article>
-    {% empty %}
-        <p>{{ user_object.username }} has not uploaded any clips yet.</p>
-    {% endfor %}
+        <div class="mt-6 space-y-6">
+            {% for clip in clips %}
+                {% include "clips/includes/clip_card.html" %}
+            {% empty %}
+                <div class="card px-6 py-16 text-center">
+                    <p class="text-sm text-ink-400">{{ user_object.username }} has not uploaded any clips yet.</p>
+                </div>
+            {% endfor %}
+        </div>
 
-    {% include "clips/includes/pagination.html" %}
+        {% include "clips/includes/pagination.html" %}
+    </div>
 {% endblock %}

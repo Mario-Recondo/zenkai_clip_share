@@ -38,6 +38,25 @@ This is a Django (Python) web app for uploading and viewing “gaming clips”. 
    python manage.py runserver
    ```
 
+## Frontend build (Tailwind CSS)
+The UI is styled with Tailwind CSS v4 via the standalone CLI — no Node.js required. The compiled stylesheet (`static/css/style.css`) is committed, so you only need this when changing styles or templates.
+
+1. Download the standalone CLI into `.bin/` (gitignored):
+   ```powershell
+   New-Item -ItemType Directory -Force .bin
+   Invoke-WebRequest https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-windows-x64.exe -OutFile .bin\tailwindcss.exe
+   ```
+2. While developing (rebuilds on template/CSS changes):
+   ```powershell
+   .\.bin\tailwindcss.exe -i static_src\input.css -o static\css\style.css --watch
+   ```
+3. Before committing style changes, build the minified version:
+   ```powershell
+   .\.bin\tailwindcss.exe -i static_src\input.css -o static\css\style.css --minify
+   ```
+
+Design tokens (dark "ink" surfaces, "ember" accent) and form/component styles live in `static_src/input.css`.
+
 ## Open in your browser
 - Home page (redirects to clip list): `http://127.0.0.1:8000/`
 - Login: `http://127.0.0.1:8000/login/`

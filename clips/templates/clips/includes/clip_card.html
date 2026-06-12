@@ -1,0 +1,14 @@
+<article class="card p-5">
+    <h2 class="text-lg font-semibold tracking-tight">{{ clip.title }}</h2>
+    <p class="mt-0.5 text-sm text-ink-400">
+        <a href="{% url 'user-clips' clip.uploader.username %}" class="font-medium text-ink-300 transition-colors hover:text-ember-400">{{ clip.uploader.username }}</a>
+        <span aria-hidden="true">&middot;</span>
+        {{ clip.date_uploaded|date:"M j, Y" }}
+    </p>
+    {% if clip.description %}
+        <p class="mt-2 text-sm leading-relaxed text-ink-300">{{ clip.description }}</p>
+    {% endif %}
+    <div class="mt-4">
+        {% include "clips/includes/clip_player.html" %}
+    </div>
+</article>
