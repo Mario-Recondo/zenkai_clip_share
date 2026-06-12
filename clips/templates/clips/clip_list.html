@@ -1,22 +1,33 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <div class="mx-auto max-w-3xl">
+    {% if query %}
+        <h1 class="text-2xl font-bold tracking-tight">Results for &ldquo;{{ query }}&rdquo;</h1>
+        <p class="mt-1 text-sm text-ink-400">{{ page_obj.paginator.count }} clip{{ page_obj.paginator.count|pluralize }} found</p>
+    {% else %}
         <h1 class="text-2xl font-bold tracking-tight">Recent Clips</h1>
         <p class="mt-1 text-sm text-ink-400">The latest plays from the community.</p>
+    {% endif %}
 
-        <div class="mt-6 space-y-6">
+    {% if clips %}
+        <div class="mt-6 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
             {% for clip in clips %}
                 {% include "clips/includes/clip_card.html" %}
-            {% empty %}
-                <div class="card flex flex-col items-center gap-2 px-6 py-16 text-center">
-                    <p class="font-medium text-ink-300">No clips yet</p>
-                    <p class="text-sm text-ink-400">Be the first to share a play.</p>
-                    <a href="{% url 'clip-create' %}" class="btn btn-primary mt-3">Upload a clip</a>
-                </div>
             {% endfor %}
         </div>
+    {% elif query %}
+        <div class="card mt-6 flex flex-col items-center gap-2 px-6 py-16 text-center">
+            <p class="font-medium text-ink-300">No clips match &ldquo;{{ query }}&rdquo;</p>
+            <p class="text-sm text-ink-400">Try a different title or username.</p>
+            <a href="{% url 'clip-list' %}" class="btn btn-secondary mt-3">Back to recent clips</a>
+        </div>
+    {% else %}
+        <div class="card mt-6 flex flex-col items-center gap-2 px-6 py-16 text-center">
+            <p class="font-medium text-ink-300">No clips yet</p>
+            <p class="text-sm text-ink-400">Be the first to share a play.</p>
+            <a href="{% url 'clip-create' %}" class="btn btn-primary mt-3">Upload a clip</a>
+        </div>
+    {% endif %}
 
-        {% include "clips/includes/pagination.html" %}
-    </div>
+    {% include "clips/includes/pagination.html" %}
 {% endblock %}

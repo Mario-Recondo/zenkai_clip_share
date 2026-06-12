@@ -14,6 +14,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <script src="{% static 'js/clip-status.js' %}" defer></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="flex min-h-full flex-col bg-ink-950 font-sans text-ink-100 antialiased">
@@ -23,9 +24,14 @@
             <a href="{% url 'clip-list' %}" class="mr-3 text-lg font-bold tracking-tight">
                 Zenkai<span class="text-ember-500">Clips</span>
             </a>
-            <a href="{% url 'clip-list' %}" class="btn btn-ghost">Home</a>
+            <a href="{% url 'clip-list' %}" class="btn btn-ghost max-sm:hidden">Home</a>
             {% if user.is_authenticated %}
-                <a href="{% url 'profile' %}" class="btn btn-ghost">Profile</a>
+                <a href="{% url 'profile' %}" class="btn btn-ghost max-sm:hidden">Profile</a>
+                <form method="get" action="{% url 'clip-list' %}" role="search" class="mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xs">
+                    <input type="search" name="q" value="{{ request.GET.q|default:'' }}"
+                           placeholder="Search clips" aria-label="Search clips"
+                           class="w-full rounded-lg border border-ink-700 bg-ink-900 px-3.5 py-1.5 text-sm text-ink-100 transition-colors placeholder:text-ink-400 focus:border-ember-500 focus:ring-1 focus:ring-ember-500 focus:outline-none">
+                </form>
                 <div class="ml-auto flex items-center gap-1">
                     <a href="{% url 'clip-create' %}" class="btn btn-primary">Upload</a>
                     <form method="post" action="{% url 'logout' %}">
@@ -51,5 +57,31 @@
     <footer class="border-t border-ink-800 py-6">
         <p class="text-center text-xs text-ink-400">Zenkai Clips — share your best plays.</p>
     </footer>
+
+    <script>
+        // When the user clears the search box on a results page, return them
+        // to the full clip list. The "search" event covers the native ×
+        // button; the debounced "input" listener covers deleting the text
+        // (the delay avoids redirecting mid-retype).
+        (function () {
+            const form = document.querySelector('form[role="search"]');
+            if (!form) return;
+            const input = form.querySelector('input[name="q"]');
+            const onResultsPage = new URLSearchParams(window.location.search).get('q');
+            if (!onResultsPage) return;
+
+            function resetIfCleared() {
+                if (input.value.trim() === '') {
+                    window.location.assign(form.action);
+                }
+            }
+            let timer;
+            input.addEventListener('search', resetIfCleared);
+            input.addEventListener('input', function () {
+                clearTimeout(timer);
+                timer = setTimeout(resetIfCleared, 500);
+            });
+        })();
+    </script>
 </body>
 </html>

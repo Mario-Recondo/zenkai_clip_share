@@ -22,6 +22,49 @@ def enqueue_transcode(clip):
     return async_task('clips.services.transcode_clip', clip.pk)
 
 
+def _extract_frame(video_path, out_path):
+    """Write a single poster frame as JPEG. Tries 1s in first (frame 0 is
+    often black), falling back to the very first frame for sub-second clips."""
+    for seek in (1.0, 0.0):
+        try:
+            (
+                ffmpeg
+                .input(video_path, ss=seek)
+                .output(out_path, vframes=1, vf='scale=640:-2', **{'qscale:v': 3})
+                .run(overwrite_output=True, quiet=True)
+            )
+            if os.path.getsize(out_path) > 0:
+                return True
+        except (ffmpeg.Error, OSError):
+            continue
+    return False
+
+
+def generate_thumbnail(clip, local_video_path):
+    """Extract a poster frame from a local video file onto clip.thumbnail.
+
+    Does not save the model; the caller decides which fields to persist.
+    Returns True on success. Failure is non-fatal by design — a card without
+    a thumbnail renders a placeholder.
+    """
+    thumb_fd, thumb_tmp = tempfile.mkstemp(suffix='.jpg')
+    os.close(thumb_fd)
+    try:
+        if not _extract_frame(local_video_path, thumb_tmp):
+            logger.warning('Thumbnail extraction failed for clip %s', clip.pk)
+            return False
+        base = os.path.splitext(os.path.basename(clip.video_file.name))[0]
+        with open(thumb_tmp, 'rb') as f:
+            clip.thumbnail.save(f'thumb_{base}.jpg', File(f), save=False)
+        return True
+    finally:
+        if os.path.exists(thumb_tmp):
+            try:
+                os.remove(thumb_tmp)
+            except OSError:
+                pass
+
+
 def transcode_clip(clip_pk):
     """Transcode a clip's raw upload to 720p H.264 and store the result.
 
@@ -68,8 +111,9 @@ def transcode_clip(clip_pk):
         converted_name = f'converted_{base}.mp4'
         with open(out_tmp, 'rb') as f:
             clip.converted_video_file.save(converted_name, File(f), save=False)
+        generate_thumbnail(clip, out_tmp)
         clip.status = Clip.Status.READY
-        clip.save(update_fields=['converted_video_file', 'status'])
+        clip.save(update_fields=['converted_video_file', 'thumbnail', 'status'])
         logger.info('Transcoded clip %s -> %s', clip.pk, clip.converted_video_file.name)
         return clip.pk
 

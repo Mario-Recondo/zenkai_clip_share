@@ -1,14 +1,33 @@
-<article class="card p-5">
-    <h2 class="text-lg font-semibold tracking-tight">{{ clip.title }}</h2>
+<article class="group"{% if clip.status == 'PENDING' or clip.status == 'PROCESSING' %} data-poll-status="{% url 'clip-status' clip.pk %}"{% endif %}>
+    <a href="{% url 'clip-detail' clip.pk %}" class="relative block aspect-video overflow-hidden rounded-xl border border-ink-700 bg-ink-900">
+        {% if clip.thumbnail %}
+            <img src="{{ clip.thumbnail.url }}" alt="" loading="lazy" class="size-full object-cover transition-transform duration-300 group-hover:scale-105">
+        {% else %}
+            <div class="js-media flex size-full items-center justify-center" aria-hidden="true">
+                <svg class="size-10 text-ink-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5.14v13.72L19 12 8 5.14z"/>
+                </svg>
+            </div>
+        {% endif %}
+        {% if clip.status == 'FAILED' %}
+            <span class="js-status-badge absolute bottom-2 left-2 rounded-md bg-red-950/90 px-2 py-0.5 text-xs font-medium text-red-300">Failed</span>
+        {% elif clip.status != 'READY' %}
+            <span class="js-status-badge absolute bottom-2 left-2 rounded-md bg-ink-950/90 px-2 py-0.5 text-xs font-medium text-ink-300">Processing</span>
+        {% endif %}
+        <span class="absolute inset-0 flex items-center justify-center bg-ink-950/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100" aria-hidden="true">
+            <span class="flex size-12 items-center justify-center rounded-full bg-ember-600">
+                <svg class="ml-0.5 size-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5.14v13.72L19 12 8 5.14z"/>
+                </svg>
+            </span>
+        </span>
+    </a>
+    <h2 class="mt-2.5 font-semibold leading-snug tracking-tight">
+        <a href="{% url 'clip-detail' clip.pk %}" class="line-clamp-2 transition-colors hover:text-ember-400">{{ clip.title }}</a>
+    </h2>
     <p class="mt-0.5 text-sm text-ink-400">
-        <a href="{% url 'user-clips' clip.uploader.username %}" class="font-medium text-ink-300 transition-colors hover:text-ember-400">{{ clip.uploader.username }}</a>
+        <a href="{% url 'user-clips' clip.uploader.username %}" class="transition-colors hover:text-ember-400">{{ clip.uploader.username }}</a>
         <span aria-hidden="true">&middot;</span>
         {{ clip.date_uploaded|date:"M j, Y" }}
     </p>
-    {% if clip.description %}
-        <p class="mt-2 text-sm leading-relaxed text-ink-300">{{ clip.description }}</p>
-    {% endif %}
-    <div class="mt-4">
-        {% include "clips/includes/clip_player.html" %}
-    </div>
 </article>

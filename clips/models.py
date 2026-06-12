@@ -11,12 +11,16 @@ class Clip(models.Model):
         FAILED = 'FAILED', 'Failed'           # transcode errored (see error_message)
 
     title = models.CharField(max_length=100)
-    description = models.TextField()
+    description = models.TextField(blank=True, default='')
     # DateTimeField (not DateField) so "newest first" can break same-day ties (Flaw #6)
     date_uploaded = models.DateTimeField(auto_now_add=True)
     video_file = models.FileField(upload_to='clips/raw_uploads')
 
     converted_video_file = models.FileField(upload_to='clips/converted', null=True, blank=True)
+
+    # Poster frame extracted by the transcode worker; cards fall back to a
+    # placeholder when missing (extraction failure is non-fatal).
+    thumbnail = models.ImageField(upload_to='clips/thumbnails', null=True, blank=True)
 
     # Explicit processing state instead of inferring it from a null file (Flaw #1/#6)
     status = models.CharField(

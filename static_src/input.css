@@ -54,6 +54,11 @@
         @apply text-ink-300 hover:bg-ink-800 hover:text-ink-100;
     }
 
+    .btn-danger {
+        @apply border border-red-900/60 bg-red-950/40 text-red-300
+            hover:bg-red-900/50 hover:text-red-200;
+    }
+
     .card {
         @apply rounded-xl border border-ink-700 bg-ink-850;
     }
@@ -113,4 +118,14 @@
     .errorlist {
         @apply mb-2 list-none space-y-1 text-sm text-red-400;
     }
+}
+
+/* Plyr (watch page player) skinned to the palette. */
+.plyr {
+    --plyr-color-main: var(--color-ember-500);
+    --plyr-video-control-color: var(--color-ink-100);
+    --plyr-menu-background: var(--color-ink-800);
+    --plyr-menu-color: var(--color-ink-100);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
 }
