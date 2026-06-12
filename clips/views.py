@@ -8,7 +8,12 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView
 
-from .forms import ClipCreateForm
+from .forms import (
+    ALLOWED_EXTENSIONS,
+    MAX_DURATION_SECONDS,
+    MAX_UPLOAD_SIZE,
+    ClipCreateForm,
+)
 from .models import Clip
 from .services import enqueue_transcode
 
@@ -62,14 +67,30 @@ class ClipCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Upload a Clip'
+        # Upload limits for the dropzone's client-side pre-checks; forms.py
+        # stays the single source of truth.
+        context['max_upload_size'] = MAX_UPLOAD_SIZE
+        context['max_duration_seconds'] = MAX_DURATION_SECONDS
+        context['allowed_extensions'] = ','.join(sorted(ALLOWED_EXTENSIONS))
         return context
+
+    @staticmethod
+    def _is_ajax(request):
+        return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
     def form_valid(self, form):
         form.instance.uploader = self.request.user
         response = super().form_valid(form)
         # Hand transcoding off to the worker instead of blocking the request (Flaw #1)
         enqueue_transcode(self.object)
+        if self._is_ajax(self.request):
+            return JsonResponse({'redirect': str(self.get_success_url())})
         return response
+
+    def form_invalid(self, form):
+        if self._is_ajax(self.request):
+            return JsonResponse({'errors': form.errors}, status=400)
+        return super().form_invalid(form)
 
 class ClipDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Clip

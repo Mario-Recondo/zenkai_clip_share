@@ -40,6 +40,31 @@ class ClipUploadFlowTests(TestCase):
 
     @mock.patch('clips.views.enqueue_transcode')
     @mock.patch('clips.forms.ClipCreateForm._probe_duration', return_value=42.0)
+    def test_ajax_upload_returns_redirect_json(self, _probe, enqueue):
+        video = SimpleUploadedFile('clip.mp4', b'\x00\x01fake', content_type='video/mp4')
+        resp = self.client.post(
+            reverse('clip-create'),
+            {'title': 'Ace', 'description': '', 'video_file': video},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['redirect'], reverse('clip-list'))
+        enqueue.assert_called_once()
+
+    @mock.patch('clips.forms.ClipCreateForm._probe_duration', return_value=120.0)
+    def test_ajax_upload_invalid_returns_error_json(self, _probe):
+        video = SimpleUploadedFile('long.mp4', b'\x00\x01fake', content_type='video/mp4')
+        resp = self.client.post(
+            reverse('clip-create'),
+            {'title': 'Long', 'description': '', 'video_file': video},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('video_file', resp.json()['errors'])
+        self.assertFalse(Clip.objects.exists())
+
+    @mock.patch('clips.views.enqueue_transcode')
+    @mock.patch('clips.forms.ClipCreateForm._probe_duration', return_value=42.0)
     def test_upload_allows_empty_description(self, _probe, enqueue):
         video = SimpleUploadedFile('clip.mp4', b'\x00\x01fake', content_type='video/mp4')
         resp = self.client.post(
