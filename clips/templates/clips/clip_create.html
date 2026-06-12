@@ -1,17 +1,66 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
     <div class="mx-auto max-w-xl">
         <h1 class="text-2xl font-bold tracking-tight">Upload a clip</h1>
-        <p class="mt-1 text-sm text-ink-400">MP4, MOV, WebM, MKV or AVI &middot; up to 90 seconds &middot; max 200&nbsp;MB.</p>
+        <p class="mt-1 text-sm text-ink-400">MP4, MOV, WebM, MKV or AVI &middot; up to {{ max_duration_seconds }} seconds &middot; max {{ max_upload_size|filesizeformat }}.</p>
 
-        <form method="post" enctype="multipart/form-data" class="form-stack card mt-6 p-6">
+        <form method="post" enctype="multipart/form-data" novalidate
+              class="js-upload-form form-stack card mt-6 p-6"
+              data-max-size="{{ max_upload_size }}"
+              data-extensions="{{ allowed_extensions }}">
             {% csrf_token %}
-            {{ form.as_p }}
+
+            <ul class="js-form-errors errorlist" hidden></ul>
+            {{ form.non_field_errors }}
+
+            <p>
+                <label for="{{ form.title.id_for_label }}">Title</label>
+                {{ form.title }}
+                {{ form.title.errors }}
+            </p>
+
+            <p>
+                <label for="{{ form.description.id_for_label }}">Description <span class="font-normal text-ink-400">(optional)</span></label>
+                {{ form.description }}
+                {{ form.description.errors }}
+            </p>
+
+            <p>
+                <label for="{{ form.video_file.id_for_label }}">Video file</label>
+                {# Dropzone is revealed by upload.js, which hides the native input. #}
+                <span class="js-dropzone flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed border-ink-600 bg-ink-900 px-4 py-10 text-center transition-colors hover:border-ink-400" hidden tabindex="0" role="button" aria-label="Choose a video file">
+                    <svg class="size-8 text-ink-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/>
+                    </svg>
+                    <span class="font-medium text-ink-100">Drag &amp; drop your clip here</span>
+                    <span class="text-sm text-ink-400">or click to browse</span>
+                </span>
+                <span class="js-file-chip mt-3 flex items-center justify-between gap-3 rounded-lg border border-ink-700 bg-ink-800 px-3.5 py-2.5" hidden>
+                    <span class="min-w-0">
+                        <span class="js-file-name block truncate text-sm font-medium text-ink-100"></span>
+                        <span class="js-file-size block text-xs text-ink-400"></span>
+                    </span>
+                    <button type="button" class="js-file-remove btn btn-ghost shrink-0 px-2 py-1 text-xs">Remove</button>
+                </span>
+                {{ form.video_file }}
+                {{ form.video_file.errors }}
+            </p>
+
+            <div class="js-progress mb-5" hidden>
+                <div class="h-2 overflow-hidden rounded-full bg-ink-700">
+                    <div class="js-progress-bar h-full w-0 rounded-full bg-ember-500 transition-[width] duration-200"></div>
+                </div>
+                <p class="js-progress-text mt-2 text-center text-sm text-ink-400"></p>
+            </div>
+
             <div class="flex gap-3">
                 <a href="{% url 'clip-list' %}" class="btn btn-secondary flex-1">Cancel</a>
-                <button type="submit" class="btn btn-primary flex-1">Upload clip</button>
+                <button type="submit" class="js-submit btn btn-primary flex-1">Upload clip</button>
             </div>
         </form>
     </div>
+
+    <script src="{% static 'js/upload.js' %}" defer></script>
 {% endblock %}
