@@ -8,7 +8,10 @@
         <form method="post" enctype="multipart/form-data" class="form-stack card mt-6 p-6">
             {% csrf_token %}
             {{ form.as_p }}
-            <button type="submit" class="btn btn-primary w-full">Upload clip</button>
+            <div class="flex gap-3">
+                <a href="{% url 'clip-list' %}" class="btn btn-secondary flex-1">Cancel</a>
+                <button type="submit" class="btn btn-primary flex-1">Upload clip</button>
+            </div>
         </form>
     </div>
 {% endblock %}
