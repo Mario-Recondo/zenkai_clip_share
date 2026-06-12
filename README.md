@@ -41,10 +41,15 @@ This is a Django (Python) web app for uploading and viewing “gaming clips”. 
 ## Frontend build (Tailwind CSS)
 The UI is styled with Tailwind CSS v4 via the standalone CLI — no Node.js required. The compiled stylesheet (`static/css/style.css`) is committed, so you only need this when changing styles or templates.
 
-1. Download the standalone CLI into `.bin/` (gitignored):
+1. Download the standalone CLI (pinned to **v4.3.0**) into `.bin/` (gitignored) and
+   verify it against the release's `sha256sums.txt` — abort if the hashes differ:
    ```powershell
    New-Item -ItemType Directory -Force .bin
-   Invoke-WebRequest https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-windows-x64.exe -OutFile .bin\tailwindcss.exe
+   Invoke-WebRequest https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.0/tailwindcss-windows-x64.exe -OutFile .bin\tailwindcss.exe
+   Invoke-WebRequest https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.0/sha256sums.txt -OutFile .bin\sha256sums.txt
+   $expected = (Select-String -Path .bin\sha256sums.txt -Pattern 'tailwindcss-windows-x64.exe').Line.Split(' ')[0]
+   $actual = (Get-FileHash .bin\tailwindcss.exe -Algorithm SHA256).Hash.ToLower()
+   if ($actual -ne $expected) { Remove-Item .bin\tailwindcss.exe; throw "Checksum mismatch - do not use this binary" } else { "Checksum OK" }
    ```
 2. While developing (rebuilds on template/CSS changes):
    ```powershell
