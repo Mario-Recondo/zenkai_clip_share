@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -69,6 +70,8 @@ MIDDLEWARE = [
 # Idle auto-logout: flush an authenticated session after this many seconds of
 # inactivity (any request resets the clock). Enforced by IdleLogoutMiddleware.
 SESSION_IDLE_TIMEOUT = env.int('SESSION_IDLE_TIMEOUT', default=1200)  # 20 minutes
+if SESSION_IDLE_TIMEOUT <= 0:
+    raise ImproperlyConfigured('SESSION_IDLE_TIMEOUT must be a positive number of seconds.')
 
 ROOT_URLCONF = 'zenkai_clip_share.urls'
 
