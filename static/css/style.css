@@ -481,6 +481,12 @@
   .border-ember-500 {
     border-color: var(--color-ember-500);
   }
+  .border-ember-500\/30 {
+    border-color: color-mix(in srgb, #de7f33 30%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-ember-500) 30%, transparent);
+    }
+  }
   .border-ink-600 {
     border-color: var(--color-ink-600);
   }
@@ -504,6 +510,12 @@
   }
   .bg-ember-500 {
     background-color: var(--color-ember-500);
+  }
+  .bg-ember-500\/10 {
+    background-color: color-mix(in srgb, #de7f33 10%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-ember-500) 10%, transparent);
+    }
   }
   .bg-ember-600 {
     background-color: var(--color-ember-600);
@@ -585,6 +597,9 @@
   }
   .py-2\.5 {
     padding-block: calc(var(--spacing) * 2.5);
+  }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
   }
   .py-6 {
     padding-block: calc(var(--spacing) * 6);

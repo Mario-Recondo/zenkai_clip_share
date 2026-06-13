@@ -60,9 +60,15 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Must come after AuthenticationMiddleware so request.user is populated.
+    'users.middleware.IdleLogoutMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Idle auto-logout: flush an authenticated session after this many seconds of
+# inactivity (any request resets the clock). Enforced by IdleLogoutMiddleware.
+SESSION_IDLE_TIMEOUT = env.int('SESSION_IDLE_TIMEOUT', default=1200)  # 20 minutes
 
 ROOT_URLCONF = 'zenkai_clip_share.urls'
 

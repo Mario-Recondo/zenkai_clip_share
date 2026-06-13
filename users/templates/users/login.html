@@ -8,6 +8,12 @@
             Zenkai<span class="text-ember-500">Clips</span>
         </p>
 
+        {% if request.GET.timeout %}
+            <p class="mt-6 rounded-lg border border-ember-500/30 bg-ember-500/10 px-4 py-3 text-center text-sm text-ember-200">
+                You were logged out due to inactivity. Please log in again.
+            </p>
+        {% endif %}
+
         <div class="card mt-6 p-6">
             <h1 class="text-center text-xl font-semibold tracking-tight">Welcome back</h1>
             <form method="post" class="form-stack mt-6">
