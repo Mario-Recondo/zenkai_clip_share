@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block content %}
-    <div class="mx-auto max-w-4xl">
+    <div class="watch-shell mx-auto max-w-4xl">
         {% include "clips/includes/clip_player.html" %}
 
         <div class="mt-5">
@@ -36,12 +36,87 @@
     {% if clip.status == 'READY' and clip.converted_video_file %}
         <script src="{% static 'vendor/plyr/plyr.js' %}"></script>
         <script>
-            new Plyr('.js-player', {
-                iconUrl: "{% static 'vendor/plyr/plyr.svg' %}",
-                controls: ['play-large', 'play', 'progress', 'current-time', 'duration',
-                           'mute', 'volume', 'settings', 'pip', 'fullscreen'],
-                settings: ['speed'],
-            });
+            (function () {
+                const player = new Plyr('.js-player', {
+                    iconUrl: "{% static 'vendor/plyr/plyr.svg' %}",
+                    controls: ['play-large', 'play', 'progress', 'current-time', 'duration',
+                               'mute', 'volume', 'settings', 'pip', 'fullscreen'],
+                    settings: ['speed'],
+                });
+
+                // Mobile: when entering fullscreen, try to lock the screen to
+                // landscape (Android/Chrome). iOS Safari lacks this API, so it
+                // falls back to native fullscreen where the user rotates the
+                // device — exactly the YouTube-on-iPhone behavior.
+                player.on('enterfullscreen', function () {
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').catch(function () {});
+                    }
+                });
+                player.on('exitfullscreen', function () {
+                    if (screen.orientation && screen.orientation.unlock) {
+                        try { screen.orientation.unlock(); } catch (e) {}
+                    }
+                });
+
+                // Desktop theater mode: inject a toggle into Plyr's control bar
+                // (left of fullscreen) that widens the player to ~full viewport
+                // width. The choice is persisted in localStorage so it carries
+                // across clips, like YouTube.
+                player.on('ready', function () {
+                    const container = player.elements.container;
+                    const controls = player.elements.controls;
+                    if (!container || !controls) return;
+                    // Theater widens the whole watch column, not just the player.
+                    const shell = container.closest('.watch-shell') || container;
+
+                    const STORAGE_KEY = 'zenkai:theater';
+                    const wideEnough = function () {
+                        return window.matchMedia('(min-width: 1024px)').matches;
+                    };
+
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'plyr__controls__item plyr__control';
+                    btn.setAttribute('data-theater', '');
+                    btn.setAttribute('aria-pressed', 'false');
+                    btn.setAttribute('aria-label', 'Theater mode');
+                    btn.innerHTML =
+                        '<svg aria-hidden="true" focusable="false" viewBox="0 0 18 18" ' +
+                            'fill="none" stroke="currentColor" stroke-width="1.6">' +
+                            '<rect x="1.5" y="4" width="15" height="10" rx="1.5"/></svg>' +
+                        '<span class="plyr__tooltip">Theater mode</span>';
+
+                    function apply(on) {
+                        shell.classList.toggle('is-theater', on);
+                        btn.setAttribute('aria-pressed', String(on));
+                        const label = on ? 'Default view' : 'Theater mode';
+                        btn.setAttribute('aria-label', label);
+                        btn.querySelector('.plyr__tooltip').textContent = label;
+                    }
+
+                    btn.addEventListener('click', function () {
+                        const on = !shell.classList.contains('is-theater');
+                        apply(on);
+                        try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch (e) {}
+                    });
+
+                    const fsBtn = controls.querySelector('[data-plyr="fullscreen"]');
+                    if (fsBtn) {
+                        controls.insertBefore(btn, fsBtn);
+                    } else {
+                        controls.appendChild(btn);
+                    }
+
+                    // Restore the saved preference, but only where theater mode
+                    // makes a visible difference (the button is hidden below lg).
+                    let saved = '0';
+                    try { saved = localStorage.getItem(STORAGE_KEY) || '0'; } catch (e) {}
+                    if (saved === '1' && wideEnough()) {
+                        apply(true);
+                    }
+                });
+            })();
         </script>
     {% endif %}
 {% endblock %}
