@@ -221,6 +221,33 @@ class TranscodeTaskTests(TestCase):
         self.assertFalse(clip.video_file)
 
     @mock.patch('clips.services.ffmpeg')
+    def test_transcode_stays_ready_if_raw_delete_fails(self, fake_ffmpeg):
+        from clips import services
+
+        clip = self._make_clip()
+
+        def fake_run(*a, **k):
+            out = fake_ffmpeg.input.return_value.output.call_args[0][0]
+            with open(out, 'wb') as f:
+                f.write(b'converted-bytes')
+        fake_ffmpeg.input.return_value.output.return_value.run.side_effect = fake_run
+
+        # Simulate storage failing on the raw-file deletion. The clip is already
+        # READY by then, so cleanup is best-effort: no exception should escape
+        # and the clip must not be downgraded to FAILED.
+        instance = Clip.objects.get(pk=clip.pk)
+        instance.video_file.delete = mock.Mock(side_effect=RuntimeError('storage down'))
+        with mock.patch('clips.services.Clip.objects.get', return_value=instance):
+            services.transcode_clip(clip.pk)
+
+        clip.refresh_from_db()
+        self.assertEqual(clip.status, Clip.Status.READY)
+        self.assertTrue(clip.converted_video_file.name)
+        # Deletion failed, so the raw is leaked but the DB stays consistent with
+        # storage (still references the raw that's still there) — not corrupted.
+        self.assertTrue(clip.video_file)
+
+    @mock.patch('clips.services.ffmpeg')
     def test_transcode_marks_failed_on_error(self, fake_ffmpeg):
         from clips import services
 
