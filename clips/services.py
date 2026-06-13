@@ -112,9 +112,23 @@ def transcode_clip(clip_pk):
         with open(out_tmp, 'rb') as f:
             clip.converted_video_file.save(converted_name, File(f), save=False)
         generate_thumbnail(clip, out_tmp)
+        # Durably record the success BEFORE touching storage destructively: once
+        # this commits, the clip is READY and plays from the converted file.
         clip.status = Clip.Status.READY
         clip.save(update_fields=['converted_video_file', 'thumbnail', 'status'])
         logger.info('Transcoded clip %s -> %s', clip.pk, clip.converted_video_file.name)
+
+        # The converted file is now the source of truth, so drop the raw upload
+        # (it would otherwise double storage use and sit reachable on the public
+        # R2 domain). This is best-effort: the clip is already READY, so a
+        # failure here is a storage leak at worst — never re-raise or downgrade
+        # the clip, which would also wrongly delete the raw of FAILED clips and
+        # block re-enqueuing.
+        try:
+            clip.video_file.delete(save=False)
+            clip.save(update_fields=['video_file'])
+        except Exception:
+            logger.warning('Could not delete raw upload for clip %s', clip.pk, exc_info=True)
         return clip.pk
 
     except ffmpeg.Error as e:

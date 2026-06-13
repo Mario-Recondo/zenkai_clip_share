@@ -8,7 +8,9 @@ from .models import Clip
 
 # Upload limits (Flaw #5). The 90s cap is the product rule; the size cap is a
 # cheap pre-filter against disk-exhaustion before we bother probing the file.
-MAX_UPLOAD_SIZE = 200 * 1024 * 1024  # 200 MB
+# 96 MB keeps uploads under Cloudflare's free-plan 100 MB request-body limit —
+# anything larger is rejected with a 413 at the edge before Django sees it.
+MAX_UPLOAD_SIZE = 96 * 1024 * 1024  # 96 MB
 MAX_DURATION_SECONDS = 90
 ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.webm', '.mkv', '.avi'}
 ALLOWED_CONTENT_TYPES = {
