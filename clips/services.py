@@ -112,8 +112,12 @@ def transcode_clip(clip_pk):
         with open(out_tmp, 'rb') as f:
             clip.converted_video_file.save(converted_name, File(f), save=False)
         generate_thumbnail(clip, out_tmp)
+        # The converted file is now the source of truth: drop the raw upload so
+        # it doesn't double storage use or sit reachable on the public R2
+        # domain. FAILED clips keep their raw so the task can be re-enqueued.
+        clip.video_file.delete(save=False)
         clip.status = Clip.Status.READY
-        clip.save(update_fields=['converted_video_file', 'thumbnail', 'status'])
+        clip.save(update_fields=['video_file', 'converted_video_file', 'thumbnail', 'status'])
         logger.info('Transcoded clip %s -> %s', clip.pk, clip.converted_video_file.name)
         return clip.pk
 

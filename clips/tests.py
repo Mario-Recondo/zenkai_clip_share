@@ -217,6 +217,8 @@ class TranscodeTaskTests(TestCase):
         self.assertEqual(clip.status, Clip.Status.READY)
         self.assertTrue(clip.converted_video_file.name)
         self.assertTrue(clip.thumbnail.name)
+        # Raw upload is deleted once the converted file exists.
+        self.assertFalse(clip.video_file)
 
     @mock.patch('clips.services.ffmpeg')
     def test_transcode_marks_failed_on_error(self, fake_ffmpeg):
