@@ -130,3 +130,47 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
 }
+
+/*
+ * Theater mode (YouTube-style). The custom toggle button injected in
+ * clip_detail.html adds `.is-theater` to the .plyr container, breaking the
+ * player out of the centered content column to span (nearly) the full
+ * viewport width. The width is capped three ways so the player never
+ * overflows or pushes its controls below the fold: by viewport width, by a
+ * height budget of 85vh (Plyr keeps the 16:9 ratio, so width * 9/16 <= 85vh),
+ * and by an absolute max for ultrawide displays. Centering via left/transform
+ * works because the content column is itself centered in the viewport.
+ * Desktop only — the button is hidden below lg, where the player is already
+ * full-width. Preference is persisted in localStorage.
+ */
+.watch-shell {
+    transition: width 0.25s ease;
+}
+
+/*
+ * Theater widens the whole watch column — player *and* the title/uploader/
+ * delete row beneath it — so the metadata aligns to the player's edges
+ * (title/uploader at the left, Delete at the right via its ml-auto). The
+ * player fills this column (its max-width:100% now resolves against the wider
+ * column). Width is capped by viewport width, an 85vh height budget (Plyr
+ * keeps 16:9, so player height = width * 9/16 <= 85vh), and a 1600px ceiling.
+ * Centering via left/transform works because the column is centered in the
+ * viewport to begin with.
+ */
+.watch-shell.is-theater {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(100vw - 2rem, calc(85vh * 16 / 9), 1600px);
+    max-width: none;
+}
+
+@media (max-width: 1023px) {
+    .plyr__control[data-theater] {
+        display: none;
+    }
+}
+
+.plyr__control[data-theater][aria-pressed="true"] {
+    color: var(--plyr-color-main);
+}
