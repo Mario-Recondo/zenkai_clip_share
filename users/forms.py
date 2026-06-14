@@ -26,7 +26,30 @@ class UserRegistrationForm(UserCreationForm):
         return user
 
 
-class ProfileUpdateForm(forms.ModelForm):
+class AvatarUpdateForm(forms.ModelForm):
+    # 5 MB cap and an explicit image-type allowlist. ImageField already
+    # confirms the upload is a decodable image; this adds the size/format
+    # guardrails for the public avatar-upload endpoint.
+    MAX_AVATAR_BYTES = 5 * 1024 * 1024
+    ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+
     class Meta:
         model = Profile
-        fields = ['profile_picture', 'bio']
+        fields = ['profile_picture']
+
+    def clean_profile_picture(self):
+        image = self.cleaned_data.get('profile_picture')
+        if not image:
+            raise forms.ValidationError("Please choose an image.")
+
+        if image.size > self.MAX_AVATAR_BYTES:
+            raise forms.ValidationError("Image must be 5 MB or smaller.")
+
+        # Reject by default: a missing content_type (None) must not slip past the
+        # allowlist. After ImageField validation this is set from the Pillow-detected
+        # format, so JPEG/PNG/WebP pass and anything else (or unknown) is rejected.
+        content_type = getattr(image, 'content_type', None)
+        if content_type not in self.ALLOWED_CONTENT_TYPES:
+            raise forms.ValidationError("Use a JPEG, PNG, or WebP image.")
+
+        return image

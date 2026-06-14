@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .forms import UserRegistrationForm, ProfileUpdateForm
+from .forms import UserRegistrationForm, AvatarUpdateForm
 from .models import Profile
 
 
@@ -27,25 +27,20 @@ def register(request):
 
 
 @login_required
-def profile(request):
-    # Ensure the user always has a Profile instance
+@require_POST
+def avatar_update(request):
+    """AJAX endpoint behind the account-menu "Change avatar" modal. Validates and
+    saves the uploaded image, then returns the new URL so the client can swap the
+    nav thumbnail live without a page reload."""
     profile_obj, _ = Profile.objects.get_or_create(user=request.user)
+    form = AvatarUpdateForm(request.POST, request.FILES, instance=profile_obj)
 
-    if request.method == 'POST':
-        p_form = ProfileUpdateForm(request.POST, request.FILES, instance=profile_obj)
+    if form.is_valid():
+        form.save()
+        return JsonResponse({'url': profile_obj.profile_picture.url})
 
-        if p_form.is_valid():
-            p_form.save()
-            return redirect('profile')
-
-    else:
-        p_form = ProfileUpdateForm(instance=profile_obj)
-
-    context = {
-        'p_form': p_form,
-        'title': f"{request.user.username}'s Profile",
-    }
-    return render(request, 'users/profile.html', context)
+    errors = form.errors.get('profile_picture', ['Could not update avatar.'])
+    return JsonResponse({'error': errors[0]}, status=400)
 
 
 @login_required

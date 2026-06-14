@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% if user.is_authenticated %}
         <link rel="stylesheet" href="{% static 'css/idle-timeout.css' %}">
+        <link rel="stylesheet" href="{% static 'css/account-menu.css' %}">
     {% endif %}
     <script src="{% static 'js/clip-status.js' %}" defer></script>
     {% block extra_head %}{% endblock %}
@@ -29,7 +30,6 @@
             </a>
             <a href="{% url 'clip-list' %}" class="btn btn-ghost max-sm:hidden">Home</a>
             {% if user.is_authenticated %}
-                <a href="{% url 'profile' %}" class="btn btn-ghost max-sm:hidden">Profile</a>
                 <form method="get" action="{% url 'clip-list' %}" role="search" class="mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xs">
                     <input type="search" name="q" value="{{ request.GET.q|default:'' }}"
                            placeholder="Search clips" aria-label="Search clips"
@@ -37,10 +37,27 @@
                 </form>
                 <div class="ml-auto flex items-center gap-1">
                     <a href="{% url 'clip-create' %}" class="btn btn-primary">Upload</a>
-                    <form method="post" action="{% url 'logout' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-ghost">Logout</button>
-                    </form>
+                    {# Account menu: avatar trigger opens a dropdown of "me" actions. #}
+                    <div class="account-menu" data-account-menu>
+                        <button type="button" class="account-menu__trigger" data-account-trigger
+                                aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+                            <span id="nav-avatar">
+                                {% include "includes/avatar.html" with profile_user=user size="size-8" %}
+                            </span>
+                            <svg class="account-menu__caret" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                                <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="account-menu__panel" data-account-panel role="menu" hidden>
+                            <button type="button" class="account-menu__item" role="menuitem" data-avatar-open>Change avatar</button>
+                            <a href="{% url 'user-clips' user.username %}" class="account-menu__item" role="menuitem">My clips</a>
+                            <div class="account-menu__divider" role="separator"></div>
+                            <form method="post" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="account-menu__item account-menu__item--danger" role="menuitem">Logout</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             {% else %}
                 <div class="ml-auto flex items-center gap-1">
@@ -92,6 +109,32 @@
         </form>
 
         <script src="{% static 'js/idle-timeout.js' %}" defer></script>
+
+        {# Change-avatar modal, driven by account-menu.js (AJAX upload + live preview). #}
+        <div id="avatar-modal" class="avatar-modal-overlay" role="dialog" aria-modal="true"
+             aria-labelledby="avatar-modal-title" hidden>
+            <div class="card avatar-modal-card">
+                <h2 id="avatar-modal-title" class="avatar-modal-title">Change avatar</h2>
+                <form id="avatar-form" method="post" action="{% url 'avatar-update' %}"
+                      enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="avatar-modal-preview">
+                        <span id="avatar-preview">
+                            {% include "includes/avatar.html" with profile_user=user size="size-16" text="text-2xl" %}
+                        </span>
+                    </div>
+                    <label for="avatar-input" class="btn btn-secondary avatar-modal-choose">Choose image</label>
+                    <input id="avatar-input" name="profile_picture" type="file" accept="image/*" hidden>
+                    <p id="avatar-error" class="avatar-modal-error" hidden></p>
+                    <div class="avatar-modal-actions">
+                        <button type="button" class="btn btn-ghost" data-avatar-cancel>Cancel</button>
+                        <button type="submit" class="btn btn-primary" data-avatar-save disabled>Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script src="{% static 'js/account-menu.js' %}" defer></script>
     {% endif %}
 
     <script>

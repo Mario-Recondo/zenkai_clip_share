@@ -10,7 +10,7 @@ urlpatterns = [
         name='dashboard',
     ),
     path('register/', views.register, name='register'),
-    path('profile/', views.profile, name='profile'),
+    path('avatar/', views.avatar_update, name='avatar-update'),
     # Idle-timeout support: keepalive ping + countdown-elapsed logout.
     path('session/ping/', views.session_ping, name='session-ping'),
     path('session/timeout-logout/', views.session_timeout_logout, name='session-timeout-logout'),
