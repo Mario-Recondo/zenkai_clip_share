@@ -1,0 +1,30 @@
+# Ruff configuration. See https://docs.astral.sh/ruff/
+target-version = "py312"
+line-length = 88
+
+# Generated/vendored code we don't author by hand.
+extend-exclude = [
+    "*/migrations/*",
+    ".venv",
+    ".bin",
+    "static",
+    "static_src",
+]
+
+[lint]
+# E/W  pycodestyle, F pyflakes, I import sorting, UP pyupgrade,
+# B bugbear, DJ Django-specific, C4 comprehensions, SIM simplifications.
+select = ["E", "W", "F", "I", "UP", "B", "DJ", "C4", "SIM"]
+# The formatter owns line width; it intentionally leaves long string literals
+# (e.g. dotted Django validator paths) alone, so don't double-flag them.
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+# Settings and manage.py legitimately use star imports / module-level side effects.
+"*/settings*.py" = ["F403", "F405", "E402"]
+"manage.py" = ["E402"]
+
+[format]
+# Ruff's formatter is Black-compatible; use double quotes and spaces.
+quote-style = "double"
+indent-style = "space"

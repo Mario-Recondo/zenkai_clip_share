@@ -1,0 +1,9 @@
+# Development-only tooling. Install with:
+#   pip install -r requirements-dev.txt
+-r requirements.txt
+
+# Linter + formatter (replaces flake8/isort/black/pyupgrade).
+ruff==0.15.17
+
+# Git hook runner that drives Ruff on commit.
+pre-commit==4.6.0

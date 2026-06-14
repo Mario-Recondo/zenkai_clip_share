@@ -1,0 +1,14 @@
+# Pre-commit hooks. Install once per clone:
+#   pip install -r requirements-dev.txt
+#   pre-commit install
+# Run against everything on demand:
+#   pre-commit run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.17
+    hooks:
+      # Lint, applying safe autofixes.
+      - id: ruff
+        args: [--fix]
+      # Format (Black-compatible).
+      - id: ruff-format
