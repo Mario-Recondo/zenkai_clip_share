@@ -26,7 +26,7 @@ STAMP_THROTTLE_SECONDS = 60
 # Fallback if SESSION_IDLE_TIMEOUT is not configured (seconds) — 20 minutes.
 DEFAULT_IDLE_TIMEOUT = 1200
 
-SESSION_KEY = 'last_activity'
+SESSION_KEY = "last_activity"
 
 
 class IdleLogoutMiddleware:
@@ -36,9 +36,9 @@ class IdleLogoutMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        user = getattr(request, 'user', None)
+        user = getattr(request, "user", None)
         if user is not None and user.is_authenticated:
-            idle_limit = getattr(settings, 'SESSION_IDLE_TIMEOUT', DEFAULT_IDLE_TIMEOUT)
+            idle_limit = getattr(settings, "SESSION_IDLE_TIMEOUT", DEFAULT_IDLE_TIMEOUT)
             now = time.time()
             last = request.session.get(SESSION_KEY)
 

@@ -1,5 +1,7 @@
 """Generate poster-frame thumbnails for READY clips that predate the
 thumbnail pipeline. Safe to re-run; clips that already have one are skipped."""
+
+import contextlib
 import os
 import tempfile
 
@@ -11,13 +13,13 @@ from clips.services import generate_thumbnail
 
 
 class Command(BaseCommand):
-    help = 'Extract thumbnails for READY clips that do not have one yet.'
+    help = "Extract thumbnails for READY clips that do not have one yet."
 
     def handle(self, *args, **options):
         clips = (
             Clip.objects.filter(status=Clip.Status.READY)
-            .filter(Q(thumbnail='') | Q(thumbnail__isnull=True))
-            .exclude(converted_video_file='')
+            .filter(Q(thumbnail="") | Q(thumbnail__isnull=True))
+            .exclude(converted_video_file="")
         )
         done = failed = 0
         for clip in clips:
@@ -25,22 +27,22 @@ class Command(BaseCommand):
             # local disk and R2) since ffmpeg needs a real path.
             local_tmp = None
             try:
-                with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
+                with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
                     local_tmp = tmp.name
-                    with clip.converted_video_file.open('rb') as src:
+                    with clip.converted_video_file.open("rb") as src:
                         for chunk in src.chunks():
                             tmp.write(chunk)
                 if generate_thumbnail(clip, local_tmp):
-                    clip.save(update_fields=['thumbnail'])
+                    clip.save(update_fields=["thumbnail"])
                     done += 1
-                    self.stdout.write(f'clip {clip.pk}: {clip.thumbnail.name}')
+                    self.stdout.write(f"clip {clip.pk}: {clip.thumbnail.name}")
                 else:
                     failed += 1
-                    self.stderr.write(f'clip {clip.pk}: extraction failed')
+                    self.stderr.write(f"clip {clip.pk}: extraction failed")
             finally:
                 if local_tmp and os.path.exists(local_tmp):
-                    try:
+                    with contextlib.suppress(OSError):
                         os.remove(local_tmp)
-                    except OSError:
-                        pass
-        self.stdout.write(self.style.SUCCESS(f'{done} thumbnail(s) generated, {failed} failed.'))
+        self.stdout.write(
+            self.style.SUCCESS(f"{done} thumbnail(s) generated, {failed} failed.")
+        )

@@ -23,84 +23,86 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
 )
-environ.Env.read_env(BASE_DIR / '.env')
+environ.Env.read_env(BASE_DIR / ".env")
 
 # SECURITY WARNING: keep the secret key secret. In production this MUST come from
 # the environment. The old hardcoded key was committed to git and is compromised —
 # rotate it (generate a fresh one) before any real deployment.
 SECRET_KEY = env(
-    'SECRET_KEY',
-    default='django-insecure-dev-only-do-not-use-in-production',
+    "SECRET_KEY",
+    default="django-insecure-dev-only-do-not-use-in-production",
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'users.apps.UsersConfig',
-    'clips',
-    'django_q',
-    'storages',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "users.apps.UsersConfig",
+    "clips",
+    "django_q",
+    "storages",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
     # Must come after AuthenticationMiddleware so request.user is populated.
-    'users.middleware.IdleLogoutMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "users.middleware.IdleLogoutMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 # Idle auto-logout: flush an authenticated session after this many seconds of
 # inactivity (any request resets the clock). Enforced by IdleLogoutMiddleware.
-SESSION_IDLE_TIMEOUT = env.int('SESSION_IDLE_TIMEOUT', default=1200)  # 20 minutes
+SESSION_IDLE_TIMEOUT = env.int("SESSION_IDLE_TIMEOUT", default=1200)  # 20 minutes
 if SESSION_IDLE_TIMEOUT <= 0:
-    raise ImproperlyConfigured('SESSION_IDLE_TIMEOUT must be a positive number of seconds.')
+    raise ImproperlyConfigured(
+        "SESSION_IDLE_TIMEOUT must be a positive number of seconds."
+    )
 
 # Seconds before the idle deadline that the client-side warning modal appears.
 # Must leave room before the timeout, so it has to be smaller than it.
-SESSION_IDLE_WARNING = env.int('SESSION_IDLE_WARNING', default=120)  # 2 minutes
+SESSION_IDLE_WARNING = env.int("SESSION_IDLE_WARNING", default=120)  # 2 minutes
 if not 0 < SESSION_IDLE_WARNING < SESSION_IDLE_TIMEOUT:
     raise ImproperlyConfigured(
-        'SESSION_IDLE_WARNING must be positive and less than SESSION_IDLE_TIMEOUT.'
+        "SESSION_IDLE_WARNING must be positive and less than SESSION_IDLE_TIMEOUT."
     )
 
-ROOT_URLCONF = 'zenkai_clip_share.urls'
+ROOT_URLCONF = "zenkai_clip_share.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-                'users.context_processors.idle_timeout',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "users.context_processors.idle_timeout",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'zenkai_clip_share.wsgi.application'
+WSGI_APPLICATION = "zenkai_clip_share.wsgi.application"
 
 
 # Database
@@ -110,9 +112,9 @@ WSGI_APPLICATION = 'zenkai_clip_share.wsgi.application'
 # Oracle box). Postgres is required in production because the web tier and the
 # django-q2 worker write concurrently and SQLite's single-writer lock can't take it.
 DATABASES = {
-    'default': env.db(
-        'DATABASE_URL',
-        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+    "default": env.db(
+        "DATABASE_URL",
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
     )
 }
 
@@ -122,16 +124,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -139,9 +141,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -151,22 +153,22 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    BASE_DIR / "static",
 ]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-LOGIN_REDIRECT_URL = 'clip-list'
+LOGIN_REDIRECT_URL = "clip-list"
 
-LOGIN_URL = 'login'
+LOGIN_URL = "login"
 
-MEDIA_ROOT = BASE_DIR / 'media'  # local-FS fallback when object storage is disabled
-MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / "media"  # local-FS fallback when object storage is disabled
+MEDIA_URL = "/media/"
 
 
 # ---------------------------------------------------------------------------
@@ -176,29 +178,35 @@ MEDIA_URL = '/media/'
 # an S3-compatible bucket — Cloudflare R2 in the recommended free setup. R2 speaks
 # the S3 API, so the only difference from AWS S3 is the endpoint URL. All web and
 # worker instances then share the same media, and Django never serves video bytes.
-USE_S3 = env.bool('USE_S3', default=False)
+USE_S3 = env.bool("USE_S3", default=False)
 
 if USE_S3:
-    AWS_ACCESS_KEY_ID = env('R2_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = env('R2_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = env('R2_BUCKET_NAME')
-    AWS_S3_ENDPOINT_URL = env('R2_ENDPOINT_URL')  # https://<accountid>.r2.cloudflarestorage.com
+    AWS_ACCESS_KEY_ID = env("R2_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = env("R2_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = env("R2_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = env(
+        "R2_ENDPOINT_URL"
+    )  # https://<accountid>.r2.cloudflarestorage.com
     # Public domain that serves the bucket (an R2 custom domain fronted by the
     # Cloudflare CDN). <video> tags point here, not at Django.
-    AWS_S3_CUSTOM_DOMAIN = env('R2_PUBLIC_DOMAIN', default=None)
-    AWS_S3_REGION_NAME = 'auto'
-    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_S3_CUSTOM_DOMAIN = env("R2_PUBLIC_DOMAIN", default=None)
+    AWS_S3_REGION_NAME = "auto"
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
     AWS_DEFAULT_ACL = None
     AWS_QUERYSTRING_AUTH = False  # serve converted clips via plain public URLs
     AWS_S3_FILE_OVERWRITE = False
     STORAGES = {
-        'default': {'BACKEND': 'storages.backends.s3.S3Storage'},
-        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+        "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        },
     }
 else:
     STORAGES = {
-        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
-        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        },
     }
 
 
@@ -209,14 +217,14 @@ else:
 # message broker, so there is no Redis/RabbitMQ to run. Transcoding is dispatched
 # to a separate `qcluster` worker process and never blocks the web request.
 Q_CLUSTER = {
-    'name': 'zenkai',
-    'workers': env.int('Q_WORKERS', default=2),
-    'timeout': 600,   # hard cap per task (s); a 90s clip transcodes well under this
-    'retry': 900,     # must be > timeout
-    'max_attempts': 2,
-    'orm': 'default',
-    'catch_up': False,
-    'label': 'Task Queue',
+    "name": "zenkai",
+    "workers": env.int("Q_WORKERS", default=2),
+    "timeout": 600,  # hard cap per task (s); a 90s clip transcodes well under this
+    "retry": 900,  # must be > timeout
+    "max_attempts": 2,
+    "orm": "default",
+    "catch_up": False,
+    "label": "Task Queue",
 }
 
 
@@ -224,18 +232,22 @@ Q_CLUSTER = {
 # Logging (Flaw #11) — transcode failures go to the log, not print()
 # ---------------------------------------------------------------------------
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'standard': {'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'},
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
     },
-    'handlers': {
-        'console': {'class': 'logging.StreamHandler', 'formatter': 'standard'},
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
     },
-    'root': {'handlers': ['console'], 'level': 'INFO'},
-    'loggers': {
-        'clips': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
-        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+    "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        "clips": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
     },
 }
 
@@ -244,11 +256,11 @@ LOGGING = {
 # Production security (Flaw #2) — only enforced when DEBUG is off
 # ---------------------------------------------------------------------------
 if not DEBUG:
-    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
+    SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     # Oracle box sits behind nginx/Cloudflare doing TLS termination
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
