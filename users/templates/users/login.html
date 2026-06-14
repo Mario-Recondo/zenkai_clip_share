@@ -5,11 +5,11 @@
 {% block content %}
     <div class="mx-auto mt-10 max-w-sm">
         <p class="text-center text-2xl font-bold tracking-tight">
-            Zenkai<span class="text-ember-500">Clips</span>
+            Zenkai<span class="text-flame-500">Clips</span>
         </p>
 
         {% if request.GET.timeout %}
-            <p class="mt-6 rounded-lg border border-ember-500/30 bg-ember-500/10 px-4 py-3 text-center text-sm text-ember-200">
+            <p class="mt-6 rounded-lg border border-flame-500/30 bg-flame-500/10 px-4 py-3 text-center text-sm text-flame-200">
                 You were logged out due to inactivity. Please log in again.
             </p>
         {% endif %}
@@ -24,7 +24,7 @@
         </div>
 
         <p class="mt-4 text-center text-sm text-ink-400">
-            Need an account? <a href="{% url 'register' %}" class="font-medium text-ember-400 transition-colors hover:text-ember-300">Sign up</a>
+            Need an account? <a href="{% url 'register' %}" class="font-medium text-flame-400 transition-colors hover:text-flame-300">Sign up</a>
         </p>
     </div>
 {% endblock %}

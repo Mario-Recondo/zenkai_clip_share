@@ -15,7 +15,7 @@
             <span class="js-status-badge absolute bottom-2 left-2 rounded-md bg-ink-950/90 px-2 py-0.5 text-xs font-medium text-ink-300">Processing</span>
         {% endif %}
         <span class="absolute inset-0 flex items-center justify-center bg-ink-950/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100" aria-hidden="true">
-            <span class="flex size-12 items-center justify-center rounded-full bg-ember-600">
+            <span class="flex size-12 items-center justify-center rounded-full bg-flame-600">
                 <svg class="ml-0.5 size-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M8 5.14v13.72L19 12 8 5.14z"/>
                 </svg>
@@ -23,10 +23,10 @@
         </span>
     </a>
     <h2 class="mt-2.5 font-semibold leading-snug tracking-tight">
-        <a href="{% url 'clip-detail' clip.pk %}" class="line-clamp-2 transition-colors hover:text-ember-400">{{ clip.title }}</a>
+        <a href="{% url 'clip-detail' clip.pk %}" class="line-clamp-2 transition-colors hover:text-flame-400">{{ clip.title }}</a>
     </h2>
     <p class="mt-0.5 text-sm text-ink-400">
-        <a href="{% url 'user-clips' clip.uploader.username %}" class="transition-colors hover:text-ember-400">{{ clip.uploader.username }}</a>
+        <a href="{% url 'user-clips' clip.uploader.username %}" class="transition-colors hover:text-flame-400">{{ clip.uploader.username }}</a>
         <span aria-hidden="true">&middot;</span>
         {{ clip.date_uploaded|date:"M j, Y" }}
     </p>

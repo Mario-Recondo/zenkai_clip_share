@@ -16,7 +16,7 @@
             <div class="mt-3 flex items-center gap-3">
                 {% include "includes/avatar.html" with profile_user=clip.uploader size="size-10" %}
                 <div>
-                    <a href="{% url 'user-clips' clip.uploader.username %}" class="font-medium transition-colors hover:text-ember-400">{{ clip.uploader.username }}</a>
+                    <a href="{% url 'user-clips' clip.uploader.username %}" class="font-medium transition-colors hover:text-flame-400">{{ clip.uploader.username }}</a>
                     <p class="text-sm text-ink-400">{{ clip.date_uploaded|date:"M j, Y" }}</p>
                 </div>
                 {% if user == clip.uploader %}
