@@ -1,0 +1,149 @@
+/* Account dropdown (avatar trigger) + change-avatar modal. Plain CSS over the
+ * existing theme variables so it needs no Tailwind rebuild; inner card/buttons
+ * reuse the .card/.btn classes. */
+
+/* ---- Dropdown ---- */
+.account-menu {
+    position: relative;
+}
+
+.account-menu__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    color: var(--color-ink-300);
+    background: transparent;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.account-menu__trigger:hover {
+    background-color: var(--color-ink-800);
+    color: var(--color-ink-100);
+}
+
+.account-menu__trigger:focus-visible {
+    outline: 2px solid var(--color-ember-500);
+    outline-offset: 2px;
+}
+
+.account-menu__caret {
+    transition: transform 0.15s;
+}
+
+.account-menu__trigger[aria-expanded="true"] .account-menu__caret {
+    transform: rotate(180deg);
+}
+
+.account-menu__panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 50;
+    min-width: 12rem;
+    padding: 0.375rem;
+    border: 1px solid var(--color-ink-700);
+    border-radius: 0.75rem;
+    background-color: var(--color-ink-850);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.account-menu__panel[hidden] {
+    display: none;
+}
+
+.account-menu__item {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 0.625rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--color-ink-100);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.12s, color 0.12s;
+}
+
+.account-menu__item:hover,
+.account-menu__item:focus-visible {
+    background-color: var(--color-ink-800);
+    outline: none;
+}
+
+.account-menu__item--danger {
+    color: #f87171;
+}
+
+.account-menu__item--danger:hover,
+.account-menu__item--danger:focus-visible {
+    background-color: color-mix(in srgb, #f87171 14%, transparent);
+}
+
+.account-menu__divider {
+    height: 1px;
+    margin: 0.375rem 0.25rem;
+    background-color: var(--color-ink-700);
+}
+
+/* ---- Change-avatar modal ---- */
+.avatar-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background-color: color-mix(in srgb, var(--color-ink-950) 75%, transparent);
+    backdrop-filter: blur(2px);
+}
+
+.avatar-modal-overlay[hidden] {
+    display: none;
+}
+
+.avatar-modal-card {
+    width: 100%;
+    max-width: 22rem;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.avatar-modal-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.avatar-modal-preview {
+    margin-top: 1.25rem;
+    display: flex;
+    justify-content: center;
+}
+
+.avatar-modal-choose {
+    margin-top: 1.25rem;
+}
+
+.avatar-modal-error {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    color: #f87171;
+}
+
+.avatar-modal-error[hidden] {
+    display: none;
+}
+
+.avatar-modal-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}

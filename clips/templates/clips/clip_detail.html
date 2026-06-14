@@ -14,11 +14,7 @@
         <div class="mt-5">
             <h1 class="text-2xl font-bold tracking-tight">{{ clip.title }}</h1>
             <div class="mt-3 flex items-center gap-3">
-                {% if clip.uploader.profile.profile_picture %}
-                    <img src="{{ clip.uploader.profile.profile_picture.url }}" alt="" class="size-10 rounded-full object-cover">
-                {% else %}
-                    <div class="flex size-10 items-center justify-center rounded-full bg-ink-700 font-bold uppercase text-ink-300" aria-hidden="true">{{ clip.uploader.username|first }}</div>
-                {% endif %}
+                {% include "includes/avatar.html" with profile_user=clip.uploader size="size-10" %}
                 <div>
                     <a href="{% url 'user-clips' clip.uploader.username %}" class="font-medium transition-colors hover:text-ember-400">{{ clip.uploader.username }}</a>
                     <p class="text-sm text-ink-400">{{ clip.date_uploaded|date:"M j, Y" }}</p>

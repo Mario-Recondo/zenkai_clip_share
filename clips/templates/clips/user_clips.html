@@ -2,11 +2,7 @@
 
 {% block content %}
     <div class="flex items-center gap-4">
-        {% if user_object.profile.profile_picture %}
-            <img src="{{ user_object.profile.profile_picture.url }}" alt="" class="size-14 rounded-full object-cover">
-        {% else %}
-            <div class="flex size-14 items-center justify-center rounded-full bg-ink-700 text-xl font-bold uppercase text-ink-300" aria-hidden="true">{{ user_object.username|first }}</div>
-        {% endif %}
+        {% include "includes/avatar.html" with profile_user=user_object size="size-14" text="text-xl" %}
         <div>
             <h1 class="text-2xl font-bold tracking-tight">{{ user_object.username }}'s Clips</h1>
             <p class="mt-0.5 text-sm text-ink-400">{{ page_obj.paginator.count }} clip{{ page_obj.paginator.count|pluralize }}</p>

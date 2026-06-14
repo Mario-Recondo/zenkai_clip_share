@@ -1,0 +1,13 @@
+{% comment %}
+Avatar thumbnail with an initial-letter fallback when the user has no uploaded
+picture. Params:
+  profile_user — the User whose avatar to show
+  size         — Tailwind size utility, e.g. "size-10" (default "size-10")
+  text         — text-size utility for the fallback letter, e.g. "text-xl" (optional)
+  extra        — extra classes appended to both image and fallback (optional)
+{% endcomment %}
+{% if profile_user.profile.profile_picture %}
+    <img src="{{ profile_user.profile.profile_picture.url }}" alt="" class="{{ size|default:'size-10' }} shrink-0 rounded-full object-cover {{ extra }}">
+{% else %}
+    <div class="{{ size|default:'size-10' }} shrink-0 flex items-center justify-center rounded-full bg-ink-700 font-bold uppercase text-ink-300 {{ text }} {{ extra }}" aria-hidden="true">{{ profile_user.username|first }}</div>
+{% endif %}
