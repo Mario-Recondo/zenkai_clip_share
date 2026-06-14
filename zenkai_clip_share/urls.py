@@ -14,27 +14,26 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 import re
 
+from django.conf import settings
 from django.contrib import admin
-from django.urls import path, include, re_path
+from django.urls import include, path, re_path
+from django.views.generic.base import RedirectView
 
 from users.views import CustomLoginView, CustomLogoutView
-from django.conf import settings
-from django.views.generic.base import RedirectView
 
 from .dev_media import ranged_serve
 
 urlpatterns = [
-    path('', RedirectView.as_view(url='clips/home/', permanent=True)),
-    path('admin/', admin.site.urls),
-    path('users/', include('users.urls')),
-
+    path("", RedirectView.as_view(url="clips/home/", permanent=True)),
+    path("admin/", admin.site.urls),
+    path("users/", include("users.urls")),
     # built in authentication path
-    path('login/', CustomLoginView.as_view(), name='login'),
-    path('logout/', CustomLogoutView.as_view(), name='logout'),
-    path('clips/', include('clips.urls')),
-
+    path("login/", CustomLoginView.as_view(), name="login"),
+    path("logout/", CustomLogoutView.as_view(), name="logout"),
+    path("clips/", include("clips.urls")),
 ]
 
 if settings.DEBUG:
@@ -42,9 +41,8 @@ if settings.DEBUG:
     # timeline seeking works against the dev server (see dev_media.py).
     urlpatterns += [
         re_path(
-            r'^%s(?P<path>.*)$' % re.escape(settings.MEDIA_URL.lstrip('/')),
+            r"^{}(?P<path>.*)$".format(re.escape(settings.MEDIA_URL.lstrip("/"))),
             ranged_serve,
-            {'document_root': settings.MEDIA_ROOT},
+            {"document_root": settings.MEDIA_ROOT},
         ),
     ]
-

@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User  # built in user model
+
 from .models import Profile
 
 
@@ -9,18 +10,20 @@ class UserRegistrationForm(UserCreationForm):
     email = forms.EmailField(required=True)  # Adds an email field
 
     class Meta:
-        model = User  # tells django to use the built-in user model with the fields below
-        fields = ['username', 'email', 'password1', 'password2']
+        model = (
+            User  # tells django to use the built-in user model with the fields below
+        )
+        fields = ["username", "email", "password1", "password2"]
 
     def clean_email(self):
-        email = self.cleaned_data.get('email')
+        email = self.cleaned_data.get("email")
         if User.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError("This email is already in use.")
         return email
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.email = self.cleaned_data['email']
+        user.email = self.cleaned_data["email"]
         if commit:
             user.save()
         return user
@@ -31,14 +34,14 @@ class AvatarUpdateForm(forms.ModelForm):
     # confirms the upload is a decodable image; this adds the size/format
     # guardrails for the public avatar-upload endpoint.
     MAX_AVATAR_BYTES = 5 * 1024 * 1024
-    ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+    ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
     class Meta:
         model = Profile
-        fields = ['profile_picture']
+        fields = ["profile_picture"]
 
     def clean_profile_picture(self):
-        image = self.cleaned_data.get('profile_picture')
+        image = self.cleaned_data.get("profile_picture")
         if not image:
             raise forms.ValidationError("Please choose an image.")
 
@@ -48,7 +51,7 @@ class AvatarUpdateForm(forms.ModelForm):
         # Reject by default: a missing content_type (None) must not slip past the
         # allowlist. After ImageField validation this is set from the Pillow-detected
         # format, so JPEG/PNG/WebP pass and anything else (or unknown) is rejected.
-        content_type = getattr(image, 'content_type', None)
+        content_type = getattr(image, "content_type", None)
         if content_type not in self.ALLOWED_CONTENT_TYPES:
             raise forms.ValidationError("Use a JPEG, PNG, or WebP image.")
 

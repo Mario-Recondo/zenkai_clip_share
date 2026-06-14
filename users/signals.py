@@ -15,4 +15,3 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
     else:
         # For existing users, make sure a profile exists.
         Profile.objects.get_or_create(user=instance)
-

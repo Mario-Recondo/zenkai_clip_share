@@ -4,6 +4,8 @@ The transcode task is the worker-side replacement for the old `post_save` signal
 (Flaw #1). It runs in a separate `qcluster` process, talks to storage through the
 Django storage API (Flaw #3), and records explicit status so failures are visible.
 """
+
+import contextlib
 import logging
 import os
 import tempfile
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def enqueue_transcode(clip):
     """Dispatch a clip for asynchronous transcoding. Returns the task id."""
-    return async_task('clips.services.transcode_clip', clip.pk)
+    return async_task("clips.services.transcode_clip", clip.pk)
 
 
 def _extract_frame(video_path, out_path):
@@ -28,9 +30,8 @@ def _extract_frame(video_path, out_path):
     for seek in (1.0, 0.0):
         try:
             (
-                ffmpeg
-                .input(video_path, ss=seek)
-                .output(out_path, vframes=1, vf='scale=640:-2', **{'qscale:v': 3})
+                ffmpeg.input(video_path, ss=seek)
+                .output(out_path, vframes=1, vf="scale=640:-2", **{"qscale:v": 3})
                 .run(overwrite_output=True, quiet=True)
             )
             if os.path.getsize(out_path) > 0:
@@ -47,22 +48,20 @@ def generate_thumbnail(clip, local_video_path):
     Returns True on success. Failure is non-fatal by design — a card without
     a thumbnail renders a placeholder.
     """
-    thumb_fd, thumb_tmp = tempfile.mkstemp(suffix='.jpg')
+    thumb_fd, thumb_tmp = tempfile.mkstemp(suffix=".jpg")
     os.close(thumb_fd)
     try:
         if not _extract_frame(local_video_path, thumb_tmp):
-            logger.warning('Thumbnail extraction failed for clip %s', clip.pk)
+            logger.warning("Thumbnail extraction failed for clip %s", clip.pk)
             return False
         base = os.path.splitext(os.path.basename(clip.video_file.name))[0]
-        with open(thumb_tmp, 'rb') as f:
-            clip.thumbnail.save(f'thumb_{base}.jpg', File(f), save=False)
+        with open(thumb_tmp, "rb") as f:
+            clip.thumbnail.save(f"thumb_{base}.jpg", File(f), save=False)
         return True
     finally:
         if os.path.exists(thumb_tmp):
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(thumb_tmp)
-            except OSError:
-                pass
 
 
 def transcode_clip(clip_pk):
@@ -74,33 +73,32 @@ def transcode_clip(clip_pk):
     """
     clip = Clip.objects.get(pk=clip_pk)
     clip.status = Clip.Status.PROCESSING
-    clip.error_message = ''
-    clip.save(update_fields=['status', 'error_message'])
+    clip.error_message = ""
+    clip.save(update_fields=["status", "error_message"])
 
     raw_name = clip.video_file.name
-    suffix = os.path.splitext(raw_name)[1] or '.mp4'
+    suffix = os.path.splitext(raw_name)[1] or ".mp4"
     raw_tmp = None
     out_tmp = None
     try:
         # Pull the raw upload down to a local temp file.
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as rt:
             raw_tmp = rt.name
-            with clip.video_file.open('rb') as src:
+            with clip.video_file.open("rb") as src:
                 for chunk in src.chunks():
                     rt.write(chunk)
 
-        out_fd, out_tmp = tempfile.mkstemp(suffix='.mp4')
+        out_fd, out_tmp = tempfile.mkstemp(suffix=".mp4")
         os.close(out_fd)
 
         (
-            ffmpeg
-            .input(raw_tmp)
+            ffmpeg.input(raw_tmp)
             .output(
                 out_tmp,
-                vcodec='libx264',
-                acodec='aac',
-                movflags='faststart',
-                vf='scale=-2:720',
+                vcodec="libx264",
+                acodec="aac",
+                movflags="faststart",
+                vf="scale=-2:720",
             )
             .run(overwrite_output=True, quiet=True)
         )
@@ -108,15 +106,15 @@ def transcode_clip(clip_pk):
         # Hand the output to the storage backend (local FS or R2) via the API,
         # never by assigning OS paths.
         base = os.path.splitext(os.path.basename(raw_name))[0]
-        converted_name = f'converted_{base}.mp4'
-        with open(out_tmp, 'rb') as f:
+        converted_name = f"converted_{base}.mp4"
+        with open(out_tmp, "rb") as f:
             clip.converted_video_file.save(converted_name, File(f), save=False)
         generate_thumbnail(clip, out_tmp)
         # Durably record the success BEFORE touching storage destructively: once
         # this commits, the clip is READY and plays from the converted file.
         clip.status = Clip.Status.READY
-        clip.save(update_fields=['converted_video_file', 'thumbnail', 'status'])
-        logger.info('Transcoded clip %s -> %s', clip.pk, clip.converted_video_file.name)
+        clip.save(update_fields=["converted_video_file", "thumbnail", "status"])
+        logger.info("Transcoded clip %s -> %s", clip.pk, clip.converted_video_file.name)
 
         # The converted file is now the source of truth, so drop the raw upload
         # (it would otherwise double storage use and sit reachable on the public
@@ -126,28 +124,28 @@ def transcode_clip(clip_pk):
         # block re-enqueuing.
         try:
             clip.video_file.delete(save=False)
-            clip.save(update_fields=['video_file'])
+            clip.save(update_fields=["video_file"])
         except Exception:
-            logger.warning('Could not delete raw upload for clip %s', clip.pk, exc_info=True)
+            logger.warning(
+                "Could not delete raw upload for clip %s", clip.pk, exc_info=True
+            )
         return clip.pk
 
     except ffmpeg.Error as e:
-        stderr = e.stderr.decode('utf-8', 'replace') if e.stderr else str(e)
-        logger.error('FFmpeg failed for clip %s: %s', clip.pk, stderr)
+        stderr = e.stderr.decode("utf-8", "replace") if e.stderr else str(e)
+        logger.error("FFmpeg failed for clip %s: %s", clip.pk, stderr)
         clip.status = Clip.Status.FAILED
         clip.error_message = stderr[-2000:]
-        clip.save(update_fields=['status', 'error_message'])
+        clip.save(update_fields=["status", "error_message"])
         raise
     except Exception as e:
-        logger.exception('Transcode failed for clip %s', clip.pk)
+        logger.exception("Transcode failed for clip %s", clip.pk)
         clip.status = Clip.Status.FAILED
         clip.error_message = str(e)[-2000:]
-        clip.save(update_fields=['status', 'error_message'])
+        clip.save(update_fields=["status", "error_message"])
         raise
     finally:
         for path in (raw_tmp, out_tmp):
             if path and os.path.exists(path):
-                try:
+                with contextlib.suppress(OSError):
                     os.remove(path)
-                except OSError:
-                    pass
