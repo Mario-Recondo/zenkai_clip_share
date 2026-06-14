@@ -25,16 +25,21 @@ env = environ.Env(
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
-# SECURITY WARNING: keep the secret key secret. In production this MUST come from
-# the environment. The old hardcoded key was committed to git and is compromised —
-# rotate it (generate a fresh one) before any real deployment.
-SECRET_KEY = env(
-    "SECRET_KEY",
-    default="django-insecure-dev-only-do-not-use-in-production",
-)
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
+
+# SECURITY WARNING: keep the secret key secret. In production this MUST come from
+# the environment. The old hardcoded key was committed to git and is compromised —
+# rotate it (generate a fresh one) before any real deployment. The insecure
+# placeholder is only allowed under DEBUG; otherwise SECRET_KEY is required and a
+# missing env var raises ImproperlyConfigured rather than starting with a known key.
+if DEBUG:
+    SECRET_KEY = env(
+        "SECRET_KEY",
+        default="django-insecure-dev-only-do-not-use-in-production",
+    )
+else:
+    SECRET_KEY = env("SECRET_KEY")
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
