@@ -14,6 +14,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% if user.is_authenticated %}
+        <link rel="stylesheet" href="{% static 'css/idle-timeout.css' %}">
+    {% endif %}
     <script src="{% static 'js/clip-status.js' %}" defer></script>
     {% block extra_head %}{% endblock %}
 </head>
@@ -57,6 +60,39 @@
     <footer class="border-t border-ink-800 py-6">
         <p class="text-center text-xs text-ink-400">Zenkai Clips — share your best plays.</p>
     </footer>
+
+    {% if user.is_authenticated %}
+        {# Idle auto-logout: config for idle-timeout.js, the warning modal, and its logout form. #}
+        <div id="idle-timeout"
+             data-timeout="{{ idle_timeout_ms }}"
+             data-warning="{{ idle_warning_ms }}"
+             data-ping-url="{% url 'session-ping' %}"
+             data-login-url="{% url 'login' %}?timeout=1"
+             hidden></div>
+
+        <div id="idle-modal" class="idle-modal-overlay" role="dialog" aria-modal="true"
+             aria-labelledby="idle-modal-title" hidden>
+            <div class="card idle-modal-card">
+                <h2 id="idle-modal-title" class="idle-modal-title">Still there?</h2>
+                <p class="idle-modal-text">
+                    You'll be logged out in
+                    <span id="idle-countdown" class="idle-modal-count">0</span>
+                    seconds due to inactivity.
+                </p>
+                <div class="idle-modal-actions">
+                    <button id="idle-stay" type="button" class="btn btn-primary">Stay logged in</button>
+                    <button id="idle-logout" type="button" class="btn btn-ghost">Log out now</button>
+                </div>
+            </div>
+        </div>
+
+        <form id="idle-logout-form" method="post"
+              action="{% url 'session-timeout-logout' %}" hidden>
+            {% csrf_token %}
+        </form>
+
+        <script src="{% static 'js/idle-timeout.js' %}" defer></script>
+    {% endif %}
 
     <script>
         // When the user clears the search box on a results page, return them

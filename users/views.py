@@ -1,6 +1,10 @@
 from django.shortcuts import render, redirect
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
+from django.http import JsonResponse
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .forms import UserRegistrationForm, ProfileUpdateForm
 from .models import Profile
@@ -42,6 +46,24 @@ def profile(request):
         'title': f"{request.user.username}'s Profile",
     }
     return render(request, 'users/profile.html', context)
+
+
+@login_required
+def session_ping(request):
+    """Keepalive hit by the idle-timeout JS while the user is active. The request
+    itself is what matters: IdleLogoutMiddleware re-stamps last_activity on it,
+    resetting the server-side inactivity clock. Returns a tiny JSON ack."""
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def session_timeout_logout(request):
+    """Client-initiated logout when the idle countdown elapses with no response.
+    POST-only and login-required so the endpoint can't show the inactivity notice
+    without actually flushing an authenticated session."""
+    logout(request)
+    return redirect(f"{reverse('login')}?timeout=1")
 
 
 class CustomLoginView(LoginView):

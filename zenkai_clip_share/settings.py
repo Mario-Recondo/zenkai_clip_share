@@ -73,6 +73,14 @@ SESSION_IDLE_TIMEOUT = env.int('SESSION_IDLE_TIMEOUT', default=1200)  # 20 minut
 if SESSION_IDLE_TIMEOUT <= 0:
     raise ImproperlyConfigured('SESSION_IDLE_TIMEOUT must be a positive number of seconds.')
 
+# Seconds before the idle deadline that the client-side warning modal appears.
+# Must leave room before the timeout, so it has to be smaller than it.
+SESSION_IDLE_WARNING = env.int('SESSION_IDLE_WARNING', default=120)  # 2 minutes
+if not 0 < SESSION_IDLE_WARNING < SESSION_IDLE_TIMEOUT:
+    raise ImproperlyConfigured(
+        'SESSION_IDLE_WARNING must be positive and less than SESSION_IDLE_TIMEOUT.'
+    )
+
 ROOT_URLCONF = 'zenkai_clip_share.urls'
 
 TEMPLATES = [
@@ -86,6 +94,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'users.context_processors.idle_timeout',
             ],
         },
     },
