@@ -45,8 +45,11 @@ class AvatarUpdateForm(forms.ModelForm):
         if image.size > self.MAX_AVATAR_BYTES:
             raise forms.ValidationError("Image must be 5 MB or smaller.")
 
+        # Reject by default: a missing content_type (None) must not slip past the
+        # allowlist. After ImageField validation this is set from the Pillow-detected
+        # format, so JPEG/PNG/WebP pass and anything else (or unknown) is rejected.
         content_type = getattr(image, 'content_type', None)
-        if content_type and content_type not in self.ALLOWED_CONTENT_TYPES:
+        if content_type not in self.ALLOWED_CONTENT_TYPES:
             raise forms.ValidationError("Use a JPEG, PNG, or WebP image.")
 
         return image
