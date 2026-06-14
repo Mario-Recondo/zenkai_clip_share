@@ -12,7 +12,7 @@
     <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% if user.is_authenticated %}
         <link rel="stylesheet" href="{% static 'css/idle-timeout.css' %}">
@@ -25,15 +25,18 @@
     {% block header %}
     <header class="sticky top-0 z-40 border-b border-ink-800 bg-ink-950/80 backdrop-blur">
         <nav class="mx-auto flex h-14 max-w-6xl items-center gap-1 px-4">
-            <a href="{% url 'clip-list' %}" class="mr-3 text-lg font-bold tracking-tight">
-                Zenkai<span class="text-ember-500">Clips</span>
+            <a href="{% url 'clip-list' %}" class="mr-3 flex items-center gap-2">
+                <img src="{% static 'img/logo.svg' %}" alt="" aria-hidden="true" class="size-8 shrink-0">
+                <span class="font-display text-xl font-bold tracking-tight">
+                    Zenkai<span class="text-flame-500">Clips</span>
+                </span>
             </a>
             <a href="{% url 'clip-list' %}" class="btn btn-ghost max-sm:hidden">Home</a>
             {% if user.is_authenticated %}
                 <form method="get" action="{% url 'clip-list' %}" role="search" class="mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xs">
                     <input type="search" name="q" value="{{ request.GET.q|default:'' }}"
                            placeholder="Search clips" aria-label="Search clips"
-                           class="w-full rounded-lg border border-ink-700 bg-ink-900 px-3.5 py-1.5 text-sm text-ink-100 transition-colors placeholder:text-ink-400 focus:border-ember-500 focus:ring-1 focus:ring-ember-500 focus:outline-none">
+                           class="w-full rounded-lg border border-ink-700 bg-ink-900 px-3.5 py-1.5 text-sm text-ink-100 transition-colors placeholder:text-ink-400 focus:border-flame-500 focus:ring-1 focus:ring-flame-500 focus:outline-none">
                 </form>
                 <div class="ml-auto flex items-center gap-1">
                     <a href="{% url 'clip-create' %}" class="btn btn-primary">Upload</a>
