@@ -101,3 +101,70 @@ class LoginTimeoutBannerTests(TestCase):
     def test_banner_absent_without_param(self):
         resp = self.client.get(reverse('login'))
         self.assertNotContains(resp, 'logged out due to inactivity')
+
+
+@_TEST_OVERRIDES
+class SessionKeepaliveTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='gamer', password='pw12345!')
+
+    def test_ping_requires_login(self):
+        resp = self.client.get(reverse('session-ping'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp['Location'])
+
+    def test_ping_returns_ok_and_refreshes_clock(self):
+        self.client.force_login(self.user)
+        # Seed a stale-but-not-expired stamp; the ping should re-stamp it.
+        stamp = time.time() - (STAMP_THROTTLE_SECONDS + 30)
+        session = self.client.session
+        session[ACTIVITY_KEY] = stamp
+        session.save()
+
+        resp = self.client.get(reverse('session-ping'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {'ok': True})
+        self.assertGreater(self.client.session[ACTIVITY_KEY], stamp)
+
+    def test_ping_past_deadline_is_logged_out(self):
+        self.client.force_login(self.user)
+        self._set_idle_past_deadline()
+        resp = self.client.get(reverse('session-ping'))
+        # Middleware intercepts before the view: bounced to login, session gone.
+        self.assertRedirects(resp, '/login/?timeout=1')
+        self.assertNotIn(LOGIN_KEY, self.client.session)
+
+    def _set_idle_past_deadline(self):
+        session = self.client.session
+        session[ACTIVITY_KEY] = time.time() - (DEADLINE + 5)
+        session.save()
+
+
+@_TEST_OVERRIDES
+class SessionTimeoutLogoutTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='gamer', password='pw12345!')
+
+    def test_post_logs_out_and_redirects_with_notice(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(reverse('session-timeout-logout'))
+        self.assertRedirects(resp, '/login/?timeout=1')
+        self.assertNotIn(LOGIN_KEY, self.client.session)
+
+
+@_TEST_OVERRIDES
+class IdleWarningModalTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='gamer', password='pw12345!')
+
+    def test_modal_and_config_rendered_for_authenticated_user(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('clip-list'))
+        self.assertContains(resp, 'id="idle-modal"')
+        # Config carries the configured timings in milliseconds.
+        self.assertContains(resp, f'data-timeout="{IDLE_LIMIT * 1000}"')
+        self.assertContains(resp, 'js/idle-timeout.js')
+
+    def test_modal_absent_for_anonymous_user(self):
+        resp = self.client.get(reverse('login'))
+        self.assertNotContains(resp, 'id="idle-modal"')

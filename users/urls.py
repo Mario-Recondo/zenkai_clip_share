@@ -11,4 +11,7 @@ urlpatterns = [
     ),
     path('register/', views.register, name='register'),
     path('profile/', views.profile, name='profile'),
+    # Idle-timeout support: keepalive ping + countdown-elapsed logout.
+    path('session/ping/', views.session_ping, name='session-ping'),
+    path('session/timeout-logout/', views.session_timeout_logout, name='session-timeout-logout'),
 ]

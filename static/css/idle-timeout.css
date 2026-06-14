@@ -1,0 +1,50 @@
+/* Idle-timeout warning modal. Plain CSS over the existing theme variables so it
+ * needs no Tailwind rebuild; the inner card/buttons reuse the .card/.btn classes. */
+
+.idle-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background-color: color-mix(in srgb, var(--color-ink-950) 75%, transparent);
+    backdrop-filter: blur(2px);
+}
+
+/* Override the [hidden] attribute being defeated by display:flex above. */
+.idle-modal-overlay[hidden] {
+    display: none;
+}
+
+.idle-modal-card {
+    width: 100%;
+    max-width: 22rem;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.idle-modal-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.idle-modal-text {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--color-ink-300);
+}
+
+.idle-modal-count {
+    font-weight: 600;
+    color: var(--color-ember-400);
+}
+
+.idle-modal-actions {
+    margin-top: 1.25rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
