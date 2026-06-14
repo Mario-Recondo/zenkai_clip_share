@@ -18,6 +18,7 @@
     const TIMEOUT = parseInt(cfg.dataset.timeout, 10); // inactivity until logout (ms)
     const WARNING = parseInt(cfg.dataset.warning, 10); // lead time before logout (ms)
     const PING_URL = cfg.dataset.pingUrl;
+    const LOGIN_URL = cfg.dataset.loginUrl; // template-resolved, survives URL prefixes
 
     const modal = document.getElementById('idle-modal');
     const countdownEl = document.getElementById('idle-countdown');
@@ -44,7 +45,7 @@
     }
 
     function toLogin() {
-        window.location.assign('/login/?timeout=1');
+        window.location.assign(LOGIN_URL);
     }
 
     function logoutNow() {

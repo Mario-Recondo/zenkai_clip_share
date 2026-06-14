@@ -151,6 +151,13 @@ class SessionTimeoutLogoutTests(TestCase):
         self.assertRedirects(resp, '/login/?timeout=1')
         self.assertNotIn(LOGIN_KEY, self.client.session)
 
+    def test_get_not_allowed(self):
+        # GET must not show the notice without ending a session.
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('session-timeout-logout'))
+        self.assertEqual(resp.status_code, 405)
+        self.assertIn(LOGIN_KEY, self.client.session)
+
 
 @_TEST_OVERRIDES
 class IdleWarningModalTests(TestCase):
@@ -163,6 +170,8 @@ class IdleWarningModalTests(TestCase):
         self.assertContains(resp, 'id="idle-modal"')
         # Config carries the configured timings in milliseconds.
         self.assertContains(resp, f'data-timeout="{IDLE_LIMIT * 1000}"')
+        # Login redirect is resolved server-side, not hardcoded in JS.
+        self.assertContains(resp, 'data-login-url="/login/?timeout=1"')
         self.assertContains(resp, 'js/idle-timeout.js')
 
     def test_modal_absent_for_anonymous_user(self):

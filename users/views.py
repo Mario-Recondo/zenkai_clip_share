@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.http import JsonResponse
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .forms import UserRegistrationForm, ProfileUpdateForm
 from .models import Profile
@@ -55,12 +56,13 @@ def session_ping(request):
     return JsonResponse({'ok': True})
 
 
+@login_required
+@require_POST
 def session_timeout_logout(request):
     """Client-initiated logout when the idle countdown elapses with no response.
-    The POST flushes the session; we always land on the login page with the
-    inactivity notice so the message matches a manual logout's silence."""
-    if request.method == 'POST':
-        logout(request)
+    POST-only and login-required so the endpoint can't show the inactivity notice
+    without actually flushing an authenticated session."""
+    logout(request)
     return redirect(f"{reverse('login')}?timeout=1")
 
 

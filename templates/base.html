@@ -67,6 +67,7 @@
              data-timeout="{{ idle_timeout_ms }}"
              data-warning="{{ idle_warning_ms }}"
              data-ping-url="{% url 'session-ping' %}"
+             data-login-url="{% url 'login' %}?timeout=1"
              hidden></div>
 
         <div id="idle-modal" class="idle-modal-overlay" role="dialog" aria-modal="true"
