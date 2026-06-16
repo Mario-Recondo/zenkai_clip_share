@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+            <h1 class="text-2xl font-bold tracking-tight">{{ collection.name }}</h1>
+            {% if collection.description %}
+                <p class="mt-1 text-sm text-ink-400">{{ collection.description }}</p>
+            {% endif %}
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+            <a href="{% url 'collection-add-clip' collection.pk %}" class="btn btn-secondary">Add a clip</a>
+            <a href="{% url 'collection-upload' collection.pk %}" class="btn btn-primary">Upload</a>
+        </div>
+    </div>
+
+    <div class="mt-8 grid gap-8 lg:grid-cols-[1fr_16rem]">
+        <div>
+            {% if clips %}
+                <div class="grid gap-x-5 gap-y-8 sm:grid-cols-2">
+                    {% for clip in clips %}
+                        <div>
+                            {% include "clips/includes/clip_card.html" %}
+                            {% if clip.user_can_unlink or clip.user_can_delete %}
+                                <div class="mt-2 flex gap-2">
+                                    {% if clip.user_can_unlink %}
+                                        <form method="post" action="{% url 'collection-remove-clip' collection.pk clip.pk %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-ghost px-2 py-1 text-xs">Remove</button>
+                                        </form>
+                                    {% endif %}
+                                    {% if clip.user_can_delete %}
+                                        <form method="post" action="{% url 'collection-delete-clip' collection.pk clip.pk %}"
+                                              onsubmit="return confirm('Delete this clip? If this collection is its only home, the clip and its files are permanently deleted.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-ghost px-2 py-1 text-xs text-red-400 hover:text-red-300">Delete</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card flex flex-col items-center gap-2 px-6 py-16 text-center">
+                    <p class="font-medium text-ink-300">No clips yet</p>
+                    <p class="text-sm text-ink-400">Upload a new clip or add one of your own.</p>
+                </div>
+            {% endif %}
+
+            {% include "clips/includes/pagination.html" %}
+        </div>
+
+        <aside class="lg:order-last">
+            <h2 class="text-sm font-semibold tracking-tight text-ink-300">Members</h2>
+            <ul class="mt-3 space-y-2">
+                <li class="flex items-center gap-2.5">
+                    {% include "includes/avatar.html" with profile_user=collection.owner size="size-8" %}
+                    <span class="min-w-0">
+                        <span class="block truncate text-sm font-medium">{{ collection.owner.username }}</span>
+                        <span class="block text-xs text-ink-500">Owner</span>
+                    </span>
+                </li>
+                {% for membership in members %}
+                    <li class="flex items-center gap-2.5">
+                        {% include "includes/avatar.html" with profile_user=membership.user size="size-8" %}
+                        <span class="block min-w-0 truncate text-sm">{{ membership.user.username }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            {% if is_owner %}
+                <div class="mt-6 border-t border-ink-800 pt-4">
+                    <a href="{% url 'collection-delete' collection.pk %}" class="btn btn-ghost w-full text-red-400 hover:text-red-300">Delete collection</a>
+                </div>
+            {% endif %}
+        </aside>
+    </div>
+{% endblock %}

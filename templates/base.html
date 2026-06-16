@@ -54,6 +54,7 @@
                         <div class="account-menu__panel" data-account-panel role="menu" hidden>
                             <button type="button" class="account-menu__item" role="menuitem" data-avatar-open>Change avatar</button>
                             <a href="{% url 'user-clips' user.username %}" class="account-menu__item" role="menuitem">My clips</a>
+                            <a href="{% url 'collection-list' %}" class="account-menu__item" role="menuitem">Collections</a>
                             <div class="account-menu__divider" role="separator"></div>
                             <form method="post" action="{% url 'logout' %}">
                                 {% csrf_token %}

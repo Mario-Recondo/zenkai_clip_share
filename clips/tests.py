@@ -30,14 +30,16 @@ class ClipUploadFlowTests(TestCase):
         video = SimpleUploadedFile(
             "clip.mp4", b"\x00\x01fake", content_type="video/mp4"
         )
-        resp = self.client.post(
-            reverse("clip-create"),
-            {"title": "Ace", "description": "clutch", "video_file": video},
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(
+                reverse("clip-create"),
+                {"title": "Ace", "description": "clutch", "video_file": video},
+            )
         self.assertEqual(resp.status_code, 302)
         clip = Clip.objects.get()
         self.assertEqual(clip.status, Clip.Status.PENDING)
         self.assertEqual(clip.uploader, self.user)
+        # Enqueue is gated on commit so a rolled-back upload never queues a job.
         enqueue.assert_called_once_with(clip)
 
     @mock.patch("clips.views.enqueue_transcode")
@@ -46,11 +48,12 @@ class ClipUploadFlowTests(TestCase):
         video = SimpleUploadedFile(
             "clip.mp4", b"\x00\x01fake", content_type="video/mp4"
         )
-        resp = self.client.post(
-            reverse("clip-create"),
-            {"title": "Ace", "description": "", "video_file": video},
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(
+                reverse("clip-create"),
+                {"title": "Ace", "description": "", "video_file": video},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["redirect"], reverse("clip-list"))
         enqueue.assert_called_once()
@@ -181,7 +184,10 @@ class ClipDeleteTests(TestCase):
         raw_path = self.clip.video_file.path
         self.assertTrue(os.path.exists(raw_path))
         self.client.force_login(self.owner)
-        resp = self.client.post(reverse("clip-delete", args=[self.clip.pk]))
+        # File cleanup runs on commit (destroy_clip queues it via on_commit), so
+        # capture and execute the callbacks to observe the storage delete.
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(reverse("clip-delete", args=[self.clip.pk]))
         self.assertRedirects(resp, reverse("clip-list"))
         self.assertFalse(Clip.objects.filter(pk=self.clip.pk).exists())
         self.assertFalse(os.path.exists(raw_path))

@@ -1,5 +1,26 @@
-from django.urls import path  # noqa: F401
+from django.urls import path
 
-# Views land in later build-order steps (core loop, invites, etc.). The include is
-# wired now so the URL namespace exists; patterns are added as views are built.
-urlpatterns = []
+from . import views
+
+urlpatterns = [
+    path("", views.collection_list, name="collection-list"),
+    path("create/", views.CollectionCreateView.as_view(), name="collection-create"),
+    path("<int:pk>/", views.collection_detail, name="collection-detail"),
+    path(
+        "<int:pk>/delete/",
+        views.CollectionDeleteView.as_view(),
+        name="collection-delete",
+    ),
+    path("<int:pk>/upload/", views.collection_upload, name="collection-upload"),
+    path("<int:pk>/add-clip/", views.collection_add_clip, name="collection-add-clip"),
+    path(
+        "<int:pk>/clips/<int:clip_pk>/remove/",
+        views.collection_remove_clip,
+        name="collection-remove-clip",
+    ),
+    path(
+        "<int:pk>/clips/<int:clip_pk>/delete/",
+        views.collection_delete_clip,
+        name="collection-delete-clip",
+    ),
+]

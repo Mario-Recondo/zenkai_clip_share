@@ -2,11 +2,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView
+
+from shared_collections.permissions import destroy_clip
 
 from .forms import (
     ALLOWED_EXTENSIONS,
@@ -85,9 +88,11 @@ class ClipCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.uploader = self.request.user
-        response = super().form_valid(form)
-        # Hand transcoding off to the worker instead of blocking the request (Flaw #1)
-        enqueue_transcode(self.object)
+        # Save the row (and file) inside a transaction and enqueue only after it
+        # commits, so a rolled-back clip can never leave a queued transcode job.
+        with transaction.atomic():
+            response = super().form_valid(form)
+        transaction.on_commit(lambda: enqueue_transcode(self.object))
         if self._is_ajax(self.request):
             return JsonResponse({"redirect": str(self.get_success_url())})
         return response
@@ -99,6 +104,21 @@ class ClipCreateView(LoginRequiredMixin, CreateView):
 
 
 class ClipDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """Collection-aware My-clips delete.
+
+    When the clip lives in 1+ collections the confirm page offers two choices:
+
+    - **Unpublish** (default, non-destructive): set ``visibility = UNLISTED``.
+      This is a *global* change — the clip leaves every public surface at once
+      (home feed, the public uploader listing, anonymous detail/status links) but
+      stays in its shared collections so members keep access.
+    - **Delete everywhere** (destructive): route through ``destroy_clip`` so the
+      single full-destroy entry point — and never a silent bypass — removes the
+      row, cascades all collection links, and cleans up files.
+
+    A clip in no collection has only the destructive path (today's behaviour).
+    """
+
     model = Clip
     template_name = "clips/clip_confirm_delete.html"
     success_url = reverse_lazy("clip-list")
@@ -107,17 +127,21 @@ class ClipDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         # Only the uploader may delete their clip (403 otherwise).
         return self.get_object().uploader == self.request.user
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["collections"] = list(self.object.collections.all())
+        return context
+
     def form_valid(self, form):
-        # Capture file refs before the row disappears, then clean up storage.
-        # Row first so a storage hiccup can only orphan files, never resurrect
-        # a deleted clip.
         clip = self.object
-        files = [clip.video_file, clip.converted_video_file, clip.thumbnail]
-        response = super().form_valid(form)
-        for f in files:
-            if f:
-                f.delete(save=False)
-        return response
+        if self.request.POST.get("action") == "unpublish":
+            # Non-destructive: drop from public surfaces, keep in collections.
+            clip.visibility = Clip.Visibility.UNLISTED
+            clip.save(update_fields=["visibility"])
+        else:
+            # The only full-destroy entry point (cascades links + cleans files).
+            destroy_clip(clip)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 # view to display a single users clips

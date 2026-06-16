@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight">Collections</h1>
+            <p class="mt-1 text-sm text-ink-400">Shared workspaces you own or have joined.</p>
+        </div>
+        <a href="{% url 'collection-create' %}" class="btn btn-primary shrink-0">New collection</a>
+    </div>
+
+    {% if collections %}
+        <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {% for collection in collections %}
+                <a href="{% url 'collection-detail' collection.pk %}"
+                   class="card flex flex-col gap-2 p-5 transition-colors hover:border-flame-500">
+                    <h2 class="font-semibold leading-snug tracking-tight line-clamp-2">{{ collection.name }}</h2>
+                    {% if collection.description %}
+                        <p class="text-sm text-ink-400 line-clamp-2">{{ collection.description }}</p>
+                    {% endif %}
+                    <p class="mt-auto text-xs text-ink-500">
+                        {% if collection.owner == user %}Owner{% else %}{{ collection.owner.username }}{% endif %}
+                        <span aria-hidden="true">&middot;</span>
+                        {{ collection.created_at|date:"M j, Y" }}
+                    </p>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card mt-6 flex flex-col items-center gap-2 px-6 py-16 text-center">
+            <p class="font-medium text-ink-300">No collections yet</p>
+            <p class="text-sm text-ink-400">Create one to start sharing clips with others.</p>
+            <a href="{% url 'collection-create' %}" class="btn btn-primary mt-3">New collection</a>
+        </div>
+    {% endif %}
+
+    {% include "clips/includes/pagination.html" %}
+{% endblock %}

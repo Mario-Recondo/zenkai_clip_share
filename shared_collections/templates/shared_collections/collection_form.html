@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="mx-auto max-w-xl">
+        <h1 class="text-2xl font-bold tracking-tight">New collection</h1>
+        <p class="mt-1 text-sm text-ink-400">Give it a name, then invite people and add clips.</p>
+
+        <form method="post" class="form-stack card mt-6 p-6">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <p>
+                <label for="{{ form.name.id_for_label }}">Name</label>
+                {{ form.name }}
+                {{ form.name.errors }}
+            </p>
+
+            <p>
+                <label for="{{ form.description.id_for_label }}">Description <span class="font-normal text-ink-400">(optional)</span></label>
+                {{ form.description }}
+                {{ form.description.errors }}
+            </p>
+
+            <div class="flex gap-3">
+                <a href="{% url 'collection-list' %}" class="btn btn-secondary flex-1">Cancel</a>
+                <button type="submit" class="btn btn-primary flex-1">Create collection</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
