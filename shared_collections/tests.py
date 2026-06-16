@@ -527,3 +527,153 @@ class CollectionAwareClipDeleteTests(TestCase):
                 {"action": "delete_everywhere"},
             )
         self.assertFalse(Clip.objects.filter(pk=clip.pk).exists())
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class MembershipLifecycleViewTests(TestCase):
+    """Step-5 sharing: invite by username, accept / decline, leave, remove-member."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user("owner", password="pw")
+        cls.invitee = User.objects.create_user("invitee", password="pw")
+        cls.outsider = User.objects.create_user("outsider", password="pw")
+
+    def setUp(self):
+        self.col = Collection.objects.create(name="C", owner=self.owner)
+
+    def _membership(self):
+        return CollectionMembership.objects.filter(
+            collection=self.col, user=self.invitee
+        ).first()
+
+    # --- invite --------------------------------------------------------------
+    def test_owner_invites_by_username_creates_pending(self):
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("collection-invite", args=[self.col.pk]),
+            {"username": "invitee"},
+        )
+        m = self._membership()
+        self.assertIsNotNone(m)
+        self.assertEqual(m.status, PENDING)
+
+    def test_non_owner_cannot_invite(self):
+        self.client.force_login(self.invitee)
+        resp = self.client.post(
+            reverse("collection-invite", args=[self.col.pk]),
+            {"username": "outsider"},
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(
+            CollectionMembership.objects.filter(collection=self.col).exists()
+        )
+
+    def test_self_invite_rejected(self):
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("collection-invite", args=[self.col.pk]),
+            {"username": "owner"},
+        )
+        self.assertFalse(
+            CollectionMembership.objects.filter(
+                collection=self.col, user=self.owner
+            ).exists()
+        )
+
+    def test_duplicate_invite_does_not_create_second_row(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=PENDING
+        )
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("collection-invite", args=[self.col.pk]),
+            {"username": "invitee"},
+        )
+        self.assertEqual(
+            CollectionMembership.objects.filter(
+                collection=self.col, user=self.invitee
+            ).count(),
+            1,
+        )
+
+    # --- accept / decline ----------------------------------------------------
+    def test_accept_sets_active_and_joined_at(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=PENDING
+        )
+        self.client.force_login(self.invitee)
+        resp = self.client.post(reverse("invite-accept", args=[self.col.pk]))
+        m = self._membership()
+        self.assertEqual(m.status, ACTIVE)
+        self.assertIsNotNone(m.joined_at)
+        self.assertRedirects(resp, reverse("collection-detail", args=[self.col.pk]))
+
+    def test_decline_deletes_the_invite(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=PENDING
+        )
+        self.client.force_login(self.invitee)
+        self.client.post(reverse("invite-decline", args=[self.col.pk]))
+        self.assertIsNone(self._membership())
+
+    def test_accept_404_when_no_pending_invite(self):
+        self.client.force_login(self.invitee)
+        resp = self.client.post(reverse("invite-accept", args=[self.col.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_my_invites_lists_pending_only(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=PENDING
+        )
+        active_col = Collection.objects.create(name="Active", owner=self.owner)
+        CollectionMembership.objects.create(
+            collection=active_col, user=self.invitee, status=ACTIVE
+        )
+        self.client.force_login(self.invitee)
+        resp = self.client.get(reverse("my-invites"))
+        self.assertContains(resp, "C")
+        self.assertNotContains(resp, "Active")
+
+    # --- leave ---------------------------------------------------------------
+    def test_active_member_can_leave(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=ACTIVE
+        )
+        self.client.force_login(self.invitee)
+        resp = self.client.post(reverse("collection-leave", args=[self.col.pk]))
+        self.assertIsNone(self._membership())
+        self.assertRedirects(resp, reverse("collection-list"))
+
+    def test_owner_cannot_leave(self):
+        self.client.force_login(self.owner)
+        resp = self.client.post(reverse("collection-leave", args=[self.col.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    # --- remove member -------------------------------------------------------
+    def test_owner_removes_member_clip_stays_and_owner_gains_delete(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=ACTIVE
+        )
+        clip = make_clip(self.invitee, Clip.Visibility.UNLISTED)
+        add_to(self.col, clip)
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("collection-remove-member", args=[self.col.pk, self.invitee.pk])
+        )
+        self.assertIsNone(self._membership())
+        # Ex-member's clip stays linked; owner now passes can_delete over it (#9).
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=self.col, clip=clip).exists()
+        )
+        self.assertTrue(can_delete(self.col, self.owner, clip))
+
+    def test_non_owner_cannot_remove_member(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=ACTIVE
+        )
+        self.client.force_login(self.invitee)
+        resp = self.client.post(
+            reverse("collection-remove-member", args=[self.col.pk, self.owner.pk])
+        )
+        self.assertEqual(resp.status_code, 404)

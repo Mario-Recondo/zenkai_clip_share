@@ -64,14 +64,55 @@
                 {% for membership in members %}
                     <li class="flex items-center gap-2.5">
                         {% include "includes/avatar.html" with profile_user=membership.user size="size-8" %}
-                        <span class="block min-w-0 truncate text-sm">{{ membership.user.username }}</span>
+                        <span class="block min-w-0 flex-1 truncate text-sm">{{ membership.user.username }}</span>
+                        {% if is_owner %}
+                            <form method="post" action="{% url 'collection-remove-member' collection.pk membership.user.pk %}"
+                                  onsubmit="return confirm('Remove {{ membership.user.username }} from this collection?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-ghost shrink-0 px-2 py-1 text-xs" aria-label="Remove {{ membership.user.username }}">Remove</button>
+                            </form>
+                        {% endif %}
                     </li>
                 {% endfor %}
             </ul>
 
             {% if is_owner %}
+                {% if pending %}
+                    <h3 class="mt-6 text-xs font-semibold uppercase tracking-wide text-ink-500">Pending invites</h3>
+                    <ul class="mt-2 space-y-2">
+                        {% for membership in pending %}
+                            <li class="flex items-center gap-2.5">
+                                {% include "includes/avatar.html" with profile_user=membership.user size="size-8" extra="opacity-60" %}
+                                <span class="block min-w-0 flex-1 truncate text-sm text-ink-400">{{ membership.user.username }}</span>
+                                <form method="post" action="{% url 'collection-remove-member' collection.pk membership.user.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-ghost shrink-0 px-2 py-1 text-xs" aria-label="Cancel invite for {{ membership.user.username }}">Cancel</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                <form method="post" action="{% url 'collection-invite' collection.pk %}" class="mt-6 border-t border-ink-800 pt-4">
+                    {% csrf_token %}
+                    <label for="invite-username" class="block text-sm font-medium">Invite a member</label>
+                    <div class="mt-2 flex gap-2">
+                        <input id="invite-username" name="username" type="text" placeholder="username" required
+                               class="min-w-0 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 text-sm text-ink-100 transition-colors placeholder:text-ink-400 focus:border-flame-500 focus:ring-1 focus:ring-flame-500 focus:outline-none">
+                        <button type="submit" class="btn btn-secondary shrink-0">Invite</button>
+                    </div>
+                </form>
+
                 <div class="mt-6 border-t border-ink-800 pt-4">
                     <a href="{% url 'collection-delete' collection.pk %}" class="btn btn-ghost w-full text-red-400 hover:text-red-300">Delete collection</a>
+                </div>
+            {% else %}
+                <div class="mt-6 border-t border-ink-800 pt-4">
+                    <form method="post" action="{% url 'collection-leave' collection.pk %}"
+                          onsubmit="return confirm('Leave this collection? Your clips stay in it.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost w-full text-red-400 hover:text-red-300">Leave collection</button>
+                    </form>
                 </div>
             {% endif %}
         </aside>

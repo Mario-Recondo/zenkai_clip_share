@@ -1,9 +1,9 @@
-"""Core-loop views for Collections (build step 3).
+"""Views for Collections (build steps 3 + 5).
 
 Create / list / detail (member-gated) / delete a collection; upload a new clip
 into a collection or add an existing own clip; unlink and safe-delete a clip
-within a collection. Sharing (invite/accept, leave, member management) and the
-owner-delete toggle land in later steps.
+within a collection; and the sharing lifecycle (invite by username, accept /
+decline, leave, owner removes a member). The owner-delete toggle lands later.
 
 All destructive clip actions route through the helpers in ``permissions`` so the
 safe-delete contract can never be bypassed. Per-clip routes are link-scoped: they
@@ -13,14 +13,17 @@ permission check, so a scoped action can't leak into a global destroy.
 
 import logging
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DeleteView
 
@@ -46,6 +49,7 @@ logger = logging.getLogger(__name__)
 PAGE_SIZE = 12
 
 ACTIVE = CollectionMembership.Status.ACTIVE
+PENDING = CollectionMembership.Status.PENDING
 
 
 def _is_ajax(request):
@@ -122,6 +126,13 @@ def collection_detail(request, pk):
         clips.append(clip)
 
     members = collection.memberships.filter(status=ACTIVE).select_related("user")
+    is_owner = collection.owner_id == request.user.id
+    # Outstanding invites are only the owner's concern.
+    pending = (
+        collection.memberships.filter(status=PENDING).select_related("user")
+        if is_owner
+        else CollectionMembership.objects.none()
+    )
 
     return render(
         request,
@@ -131,7 +142,8 @@ def collection_detail(request, pk):
             "clips": clips,
             "page_obj": page_obj,
             "members": members,
-            "is_owner": collection.owner_id == request.user.id,
+            "pending": pending,
+            "is_owner": is_owner,
             "title": collection.name,
         },
     )
@@ -291,3 +303,106 @@ def collection_delete_clip(request, pk, clip_pk):
         raise Http404("No clip matches the given query.")
     delete_clip_in_collection(collection, clip)
     return redirect("collection-detail", pk=collection.pk)
+
+
+# --- Membership: invite / accept / decline / leave / remove -------------------
+
+
+def _get_owned_collection(request, pk):
+    """Fetch the collection or 404 unless the request user owns it."""
+    collection = get_object_or_404(Collection, pk=pk)
+    if collection.owner_id != request.user.id:
+        raise Http404("No collection matches the given query.")
+    return collection
+
+
+@login_required
+@require_POST
+def collection_invite(request, pk):
+    """Owner invites a user by username, creating a PENDING membership."""
+    collection = _get_owned_collection(request, pk)
+    username = request.POST.get("username", "").strip()
+    invitee = User.objects.filter(username=username).first()
+
+    if invitee is None:
+        messages.error(request, f"No user named “{username}”.")
+    elif invitee.id == collection.owner_id:
+        messages.error(request, "You already own this collection.")
+    else:
+        _, created = CollectionMembership.objects.get_or_create(
+            collection=collection, user=invitee, defaults={"status": PENDING}
+        )
+        if created:
+            messages.success(request, f"Invited {invitee.username}.")
+        else:
+            messages.error(
+                request, f"{invitee.username} is already invited or a member."
+            )
+    return redirect("collection-detail", pk=collection.pk)
+
+
+@login_required
+@require_POST
+def collection_remove_member(request, pk, user_pk):
+    """Owner removes a member. Their clips stay (decision #9); the owner then
+    auto-gains delete permission over them (handled by ``can_delete``)."""
+    collection = _get_owned_collection(request, pk)
+    membership = get_object_or_404(
+        CollectionMembership, collection=collection, user_id=user_pk
+    )
+    membership.delete()
+    return redirect("collection-detail", pk=collection.pk)
+
+
+@login_required
+@require_POST
+def collection_leave(request, pk):
+    """An active member leaves. The owner can't leave (they delete instead)."""
+    collection = get_object_or_404(Collection, pk=pk)
+    if collection.owner_id == request.user.id:
+        raise Http404("No collection matches the given query.")
+    membership = get_object_or_404(
+        CollectionMembership, collection=collection, user=request.user
+    )
+    membership.delete()
+    messages.success(request, f"You left “{collection.name}”.")
+    return redirect("collection-list")
+
+
+@login_required
+def my_invites(request):
+    """Pending collection invites for the current user; accept or decline."""
+    invites = (
+        CollectionMembership.objects.filter(user=request.user, status=PENDING)
+        .select_related("collection", "collection__owner")
+        .order_by("-invited_at")
+    )
+    return render(
+        request,
+        "shared_collections/my_invites.html",
+        {"invites": invites, "title": "My invites"},
+    )
+
+
+@login_required
+@require_POST
+def invite_accept(request, pk):
+    """Accept a pending invite to collection ``pk`` (status ACTIVE, stamp joined_at)."""
+    membership = get_object_or_404(
+        CollectionMembership, collection_id=pk, user=request.user, status=PENDING
+    )
+    membership.status = ACTIVE
+    membership.joined_at = timezone.now()
+    membership.save(update_fields=["status", "joined_at"])
+    return redirect("collection-detail", pk=pk)
+
+
+@login_required
+@require_POST
+def invite_decline(request, pk):
+    """Decline a pending invite to collection ``pk`` (delete the row)."""
+    membership = get_object_or_404(
+        CollectionMembership, collection_id=pk, user=request.user, status=PENDING
+    )
+    membership.delete()
+    return redirect("my-invites")

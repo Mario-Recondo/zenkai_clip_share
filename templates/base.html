@@ -55,6 +55,7 @@
                             <button type="button" class="account-menu__item" role="menuitem" data-avatar-open>Change avatar</button>
                             <a href="{% url 'user-clips' user.username %}" class="account-menu__item" role="menuitem">My clips</a>
                             <a href="{% url 'collection-list' %}" class="account-menu__item" role="menuitem">Collections</a>
+                            <a href="{% url 'my-invites' %}" class="account-menu__item" role="menuitem">My invites</a>
                             <div class="account-menu__divider" role="separator"></div>
                             <form method="post" action="{% url 'logout' %}">
                                 {% csrf_token %}
@@ -74,6 +75,13 @@
     {% endblock %}
 
     <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10">
+        {% if messages %}
+            <ul class="mb-6 space-y-2">
+                {% for message in messages %}
+                    <li class="rounded-lg border px-4 py-2.5 text-sm {% if message.tags == 'error' %}border-red-900 bg-red-950/40 text-red-200{% else %}border-ink-700 bg-ink-850 text-ink-200{% endif %}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
         {% block content %}
         {% endblock %}
     </main>

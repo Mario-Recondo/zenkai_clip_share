@@ -5,6 +5,9 @@ from . import views
 urlpatterns = [
     path("", views.collection_list, name="collection-list"),
     path("create/", views.CollectionCreateView.as_view(), name="collection-create"),
+    path("invites/", views.my_invites, name="my-invites"),
+    path("invites/<int:pk>/accept/", views.invite_accept, name="invite-accept"),
+    path("invites/<int:pk>/decline/", views.invite_decline, name="invite-decline"),
     path("<int:pk>/", views.collection_detail, name="collection-detail"),
     path(
         "<int:pk>/delete/",
@@ -22,5 +25,12 @@ urlpatterns = [
         "<int:pk>/clips/<int:clip_pk>/delete/",
         views.collection_delete_clip,
         name="collection-delete-clip",
+    ),
+    path("<int:pk>/invite/", views.collection_invite, name="collection-invite"),
+    path("<int:pk>/leave/", views.collection_leave, name="collection-leave"),
+    path(
+        "<int:pk>/members/<int:user_pk>/remove/",
+        views.collection_remove_member,
+        name="collection-remove-member",
     ),
 ]
