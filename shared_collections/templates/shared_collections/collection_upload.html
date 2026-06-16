@@ -51,6 +51,14 @@
                 {{ form.video_file.errors }}
             </p>
 
+            <p>
+                <label class="flex items-center gap-2.5 font-normal">
+                    <input type="checkbox" name="post_to_home">
+                    <span>Also post to the public home feed</span>
+                </label>
+                <span class="helptext">Otherwise the clip stays unlisted and is only visible inside this collection.</span>
+            </p>
+
             <div class="js-progress mb-5" hidden>
                 <div class="h-2 overflow-hidden rounded-full bg-ink-700">
                     <div class="js-progress-bar h-full w-0 rounded-full bg-flame-500 transition-[width] duration-200"></div>

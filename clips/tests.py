@@ -7,6 +7,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from shared_collections.models import (
+    Collection,
+    CollectionClip,
+    CollectionMembership,
+)
+
 from .models import Clip
 
 # Production security settings turn on when DEBUG=False (which is the case under
@@ -295,3 +301,111 @@ class TranscodeTaskTests(TestCase):
         clip.refresh_from_db()
         self.assertEqual(clip.status, Clip.Status.FAILED)
         self.assertIn("boom", clip.error_message)
+
+
+@_TEST_OVERRIDES
+class VisibilityGatingTests(TestCase):
+    """Step-4 access boundaries: PUBLIC clips stay world-viewable; UNLISTED clips
+    are hidden from the home feed, public listings, and detail/status for anyone
+    but the uploader and active members."""
+
+    def setUp(self):
+        self.uploader = User.objects.create_user("uploader", password="pw")
+        self.member = User.objects.create_user("member", password="pw")
+        self.outsider = User.objects.create_user("outsider", password="pw")
+        self.public = Clip.objects.create(
+            title="Public play",
+            uploader=self.uploader,
+            video_file=SimpleUploadedFile("p.mp4", b"x"),
+            visibility=Clip.Visibility.PUBLIC,
+        )
+        self.unlisted = Clip.objects.create(
+            title="Unlisted play",
+            uploader=self.uploader,
+            video_file=SimpleUploadedFile("u.mp4", b"x"),
+            visibility=Clip.Visibility.UNLISTED,
+        )
+
+    def _share_unlisted_with_member(self):
+        col = Collection.objects.create(name="C", owner=self.uploader)
+        membership = CollectionMembership.objects.create(
+            collection=col,
+            user=self.member,
+            status=CollectionMembership.Status.ACTIVE,
+        )
+        CollectionClip.objects.create(
+            collection=col, clip=self.unlisted, added_by=self.uploader
+        )
+        return col, membership
+
+    # --- home feed -----------------------------------------------------------
+    def test_home_feed_hides_unlisted_shows_public(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("clip-list"))
+        self.assertContains(resp, "Public play")
+        self.assertNotContains(resp, "Unlisted play")
+
+    # --- uploader listing ----------------------------------------------------
+    def test_uploader_sees_own_unlisted_on_their_page(self):
+        self.client.force_login(self.uploader)
+        resp = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertContains(resp, "Public play")
+        self.assertContains(resp, "Unlisted play")
+
+    def test_other_viewer_sees_only_public_on_listing(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertContains(resp, "Public play")
+        self.assertNotContains(resp, "Unlisted play")
+
+    def test_anonymous_sees_only_public_on_listing(self):
+        resp = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertContains(resp, "Public play")
+        self.assertNotContains(resp, "Unlisted play")
+
+    # --- detail gate ---------------------------------------------------------
+    def test_public_detail_viewable_anonymously(self):
+        resp = self.client.get(reverse("clip-detail", args=[self.public.pk]))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_unlisted_detail_404_for_anonymous_and_outsider(self):
+        resp = self.client.get(reverse("clip-detail", args=[self.unlisted.pk]))
+        self.assertEqual(resp.status_code, 404)
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("clip-detail", args=[self.unlisted.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_unlisted_detail_200_for_uploader_and_active_member(self):
+        self._share_unlisted_with_member()
+        for user in (self.uploader, self.member):
+            self.client.force_login(user)
+            resp = self.client.get(reverse("clip-detail", args=[self.unlisted.pk]))
+            self.assertEqual(resp.status_code, 200)
+
+    def test_ex_member_loses_detail_access(self):
+        _col, membership = self._share_unlisted_with_member()
+        self.client.force_login(self.member)
+        self.assertEqual(
+            self.client.get(
+                reverse("clip-detail", args=[self.unlisted.pk])
+            ).status_code,
+            200,
+        )
+        membership.delete()
+        self.assertEqual(
+            self.client.get(
+                reverse("clip-detail", args=[self.unlisted.pk])
+            ).status_code,
+            404,
+        )
+
+    # --- status gate ---------------------------------------------------------
+    def test_public_status_returns_json_to_anonymous(self):
+        resp = self.client.get(reverse("clip-status", args=[self.public.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["status"], Clip.Status.PENDING)
+
+    def test_unlisted_status_404_for_outsider(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("clip-status", args=[self.unlisted.pk]))
+        self.assertEqual(resp.status_code, 404)

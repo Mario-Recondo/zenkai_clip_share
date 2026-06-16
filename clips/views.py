@@ -4,12 +4,12 @@ from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView
 
-from shared_collections.permissions import destroy_clip
+from shared_collections.permissions import can_view, destroy_clip
 
 from .forms import (
     ALLOWED_EXTENSIONS,
@@ -26,8 +26,14 @@ PAGE_SIZE = 12
 # Create your views here.
 @login_required
 def clip_list(request):
+    # Public home feed: UNLISTED clips live only inside collections / direct
+    # links, so they must never surface here.
     # select_related avoids an N+1 on clip.uploader.username (Flaw #4)
-    clip_qs = Clip.objects.select_related("uploader").order_by("-date_uploaded")
+    clip_qs = (
+        Clip.objects.filter(visibility=Clip.Visibility.PUBLIC)
+        .select_related("uploader")
+        .order_by("-date_uploaded")
+    )
     query = request.GET.get("q", "").strip()
     if query:
         clip_qs = clip_qs.filter(
@@ -47,6 +53,11 @@ def clip_list(request):
 
 def clip_detail(request, pk):
     clip = get_object_or_404(Clip.objects.select_related("uploader"), pk=pk)
+    # Conditional gate (NOT @login_required): can_view returns True for PUBLIC
+    # clips so they stay anonymously viewable; UNLISTED clips are restricted to
+    # the uploader / active members, everyone else gets a 404.
+    if not can_view(clip, request.user):
+        raise Http404("No clip matches the given query.")
     return render(
         request, "clips/clip_detail.html", {"clip": clip, "title": clip.title}
     )
@@ -54,7 +65,15 @@ def clip_detail(request, pk):
 
 def clip_status(request, pk):
     """Tiny JSON endpoint polled by the frontend while a clip transcodes."""
-    clip = get_object_or_404(Clip.objects.only("status", "thumbnail"), pk=pk)
+    # Load the fields can_view needs alongside the status payload, so the gate
+    # doesn't trigger extra queries.
+    clip = get_object_or_404(
+        Clip.objects.only("status", "thumbnail", "visibility", "uploader"), pk=pk
+    )
+    # Same conditional gate as clip_detail: PUBLIC clips keep returning JSON to
+    # anonymous pollers; UNLISTED ones 404 for non-uploaders / non-members.
+    if not can_view(clip, request.user):
+        raise Http404("No clip matches the given query.")
     return JsonResponse(
         {
             "status": clip.status,
@@ -152,6 +171,12 @@ def user_clips(request, username):
         .select_related("uploader")
         .order_by("-date_uploaded")
     )
+    # Public listing: only the owner viewing their own page sees their UNLISTED
+    # clips. Any other viewer (incl. anonymous) sees just this user's PUBLIC
+    # clips — and the owner's own page is the safety net that always reaches a
+    # clip unlinked from every collection.
+    if request.user != user:
+        clip_qs = clip_qs.filter(visibility=Clip.Visibility.PUBLIC)
     page_obj = Paginator(clip_qs, PAGE_SIZE).get_page(request.GET.get("page"))
     context = {
         "user_object": user,

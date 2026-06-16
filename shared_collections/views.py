@@ -155,8 +155,8 @@ class CollectionDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 def collection_upload(request, pk):
     """Upload a brand-new clip directly into a collection (active members only).
 
-    The clip defaults to UNLISTED (collection-only); the "also post to home"
-    toggle that promotes it to PUBLIC arrives in the visibility-gating step.
+    The clip defaults to UNLISTED (collection-only). The "also post to home
+    feed" checkbox promotes it to PUBLIC so it also appears on the public feed.
     """
     collection = _get_active_member_collection(request, pk)
 
@@ -165,7 +165,12 @@ def collection_upload(request, pk):
         if form.is_valid():
             clip = form.save(commit=False)
             clip.uploader = request.user
-            clip.visibility = Clip.Visibility.UNLISTED
+            # Default UNLISTED (collection-only); opt in to the public home feed.
+            clip.visibility = (
+                Clip.Visibility.PUBLIC
+                if request.POST.get("post_to_home")
+                else Clip.Visibility.UNLISTED
+            )
             try:
                 # Clip row AND its link commit together; a failure rolls both back.
                 with transaction.atomic():

@@ -368,6 +368,28 @@ class CoreLoopViewTests(TestCase):
         enqueue.assert_called_once_with(clip)
         self.assertRedirects(resp, reverse("collection-detail", args=[self.col.pk]))
 
+    @patch("shared_collections.views.enqueue_transcode")
+    @patch("clips.forms.ClipCreateForm._probe_duration", return_value=10.0)
+    def test_upload_post_to_home_makes_clip_public(self, _probe, _enqueue):
+        self.client.force_login(self.member)
+        video = SimpleUploadedFile("c.mp4", b"data", content_type="video/mp4")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("collection-upload", args=[self.col.pk]),
+                {
+                    "title": "Public play",
+                    "description": "",
+                    "video_file": video,
+                    "post_to_home": "on",
+                },
+            )
+        clip = Clip.objects.get(title="Public play")
+        self.assertEqual(clip.visibility, Clip.Visibility.PUBLIC)
+        # Still linked to the collection as well as posted to the feed.
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=self.col, clip=clip).exists()
+        )
+
     # --- add existing own clip -----------------------------------------------
     def test_member_can_add_own_clip(self):
         clip = make_clip(self.member)
