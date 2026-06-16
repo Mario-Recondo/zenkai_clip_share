@@ -677,3 +677,43 @@ class MembershipLifecycleViewTests(TestCase):
             reverse("collection-remove-member", args=[self.col.pk, self.owner.pk])
         )
         self.assertEqual(resp.status_code, 404)
+
+    # --- allow_owner_delete toggle (step 6) ----------------------------------
+    def test_member_opts_owner_in_then_out(self):
+        m = CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=ACTIVE
+        )
+        clip = make_clip(self.invitee, Clip.Visibility.UNLISTED)
+        add_to(self.col, clip)
+        self.assertFalse(can_delete(self.col, self.owner, clip))  # default off
+
+        self.client.force_login(self.invitee)
+        self.client.post(
+            reverse("membership-settings", args=[self.col.pk]),
+            {"allow_owner_delete": "on"},
+        )
+        m.refresh_from_db()
+        self.assertTrue(m.allow_owner_delete)
+        self.assertTrue(can_delete(self.col, self.owner, clip))
+
+        # Unchecked checkbox sends no value -> opts the owner back out.
+        self.client.post(reverse("membership-settings", args=[self.col.pk]), {})
+        m.refresh_from_db()
+        self.assertFalse(m.allow_owner_delete)
+        self.assertFalse(can_delete(self.col, self.owner, clip))
+
+    def test_owner_cannot_use_membership_settings(self):
+        self.client.force_login(self.owner)
+        resp = self.client.post(
+            reverse("membership-settings", args=[self.col.pk]),
+            {"allow_owner_delete": "on"},
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_non_member_cannot_use_membership_settings(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.post(
+            reverse("membership-settings", args=[self.col.pk]),
+            {"allow_owner_delete": "on"},
+        )
+        self.assertEqual(resp.status_code, 404)

@@ -1,9 +1,10 @@
-"""Views for Collections (build steps 3 + 5).
+"""Views for Collections (build steps 3 + 5 + 6).
 
 Create / list / detail (member-gated) / delete a collection; upload a new clip
 into a collection or add an existing own clip; unlink and safe-delete a clip
-within a collection; and the sharing lifecycle (invite by username, accept /
-decline, leave, owner removes a member). The owner-delete toggle lands later.
+within a collection; the sharing lifecycle (invite by username, accept /
+decline, leave, owner removes a member); and the member's self-service
+``allow_owner_delete`` toggle.
 
 All destructive clip actions route through the helpers in ``permissions`` so the
 safe-delete contract can never be bypassed. Per-clip routes are link-scoped: they
@@ -133,6 +134,13 @@ def collection_detail(request, pk):
         if is_owner
         else CollectionMembership.objects.none()
     )
+    # A member's own membership drives the self-service allow_owner_delete toggle
+    # (the owner has no membership row).
+    my_membership = (
+        None
+        if is_owner
+        else collection.memberships.filter(user=request.user, status=ACTIVE).first()
+    )
 
     return render(
         request,
@@ -144,6 +152,7 @@ def collection_detail(request, pk):
             "members": members,
             "pending": pending,
             "is_owner": is_owner,
+            "my_membership": my_membership,
             "title": collection.name,
         },
     )
@@ -406,3 +415,21 @@ def invite_decline(request, pk):
     )
     membership.delete()
     return redirect("my-invites")
+
+
+@login_required
+@require_POST
+def membership_settings(request, pk):
+    """A member toggles their own ``allow_owner_delete`` for this collection.
+
+    Self-service only: it acts on the requester's own ACTIVE membership, so the
+    owner (who has no membership row) and non-members can't reach it. This opts
+    the owner in/out of deleting the member's clips — the active-member branch of
+    ``can_delete``; the ex-member auto-permission is independent of this flag.
+    """
+    membership = get_object_or_404(
+        CollectionMembership, collection_id=pk, user=request.user, status=ACTIVE
+    )
+    membership.allow_owner_delete = bool(request.POST.get("allow_owner_delete"))
+    membership.save(update_fields=["allow_owner_delete"])
+    return redirect("collection-detail", pk=pk)

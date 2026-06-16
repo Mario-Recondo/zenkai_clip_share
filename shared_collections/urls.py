@@ -27,6 +27,7 @@ urlpatterns = [
         name="collection-delete-clip",
     ),
     path("<int:pk>/invite/", views.collection_invite, name="collection-invite"),
+    path("<int:pk>/settings/", views.membership_settings, name="membership-settings"),
     path("<int:pk>/leave/", views.collection_leave, name="collection-leave"),
     path(
         "<int:pk>/members/<int:user_pk>/remove/",

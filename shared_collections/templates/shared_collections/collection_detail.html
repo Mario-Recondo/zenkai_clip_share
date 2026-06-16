@@ -107,6 +107,22 @@
                     <a href="{% url 'collection-delete' collection.pk %}" class="btn btn-ghost w-full text-red-400 hover:text-red-300">Delete collection</a>
                 </div>
             {% else %}
+                {% if my_membership %}
+                    <form method="post" action="{% url 'membership-settings' collection.pk %}" class="mt-6 border-t border-ink-800 pt-4">
+                        {% csrf_token %}
+                        <label class="flex cursor-pointer items-start gap-2.5 text-sm">
+                            <input type="checkbox" name="allow_owner_delete"
+                                   onchange="this.form.submit()"
+                                   {% if my_membership.allow_owner_delete %}checked{% endif %}
+                                   class="mt-0.5">
+                            <span>
+                                <span class="block font-medium">Let the owner delete my clips</span>
+                                <span class="block text-ink-400">By default the owner can only remove your clips from the collection, not delete them.</span>
+                            </span>
+                        </label>
+                    </form>
+                {% endif %}
+
                 <div class="mt-6 border-t border-ink-800 pt-4">
                     <form method="post" action="{% url 'collection-leave' collection.pk %}"
                           onsubmit="return confirm('Leave this collection? Your clips stay in it.');">
