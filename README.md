@@ -1,11 +1,12 @@
 # zenkai_clip_share
 
 ## What this is
-This is a Django (Python) web app for uploading and viewing “gaming clips”. It uses SQLite for the database in development and transcodes uploads to 720p MP4 in a background worker using `ffmpeg`.
+This is a Django (Python) web app for uploading and viewing “gaming clips”. It uses PostgreSQL for the database and transcodes uploads to 720p MP4 in a background worker using `ffmpeg`.
 
 ## Prerequisites
 - Python 3.10+ (recommended)
 - `ffmpeg` installed on your machine and available in your `PATH` (required for video transcoding and thumbnails)
+- **PostgreSQL** — required by the Collections feature, whose concurrency safety relies on `SELECT ... FOR UPDATE` row locks (SQLite ignores them, so the app fails closed with system check `shared_collections.E001`). Use it for dev, CI, and production.
 
 ## Setup (Windows / PowerShell)
 Done once per machine.
@@ -28,11 +29,17 @@ Done once per machine.
    ```
    Paste the generated key into `SECRET_KEY=` in `.env`. The example file's dev
    defaults (`DEBUG=True`, `USE_S3=False`) are correct for local work.
-5. Verify `ffmpeg` is available:
+5. Create the PostgreSQL database and set `DATABASE_URL` in `.env`
+   (Collections requires Postgres — see Prerequisites):
+   ```powershell
+   & "C:\Program Files\PostgreSQL\18\bin\createdb.exe" -U postgres zenkai_clip_share
+   # then in .env:  DATABASE_URL=postgres://postgres:<password>@localhost:5432/zenkai_clip_share
+   ```
+6. Verify `ffmpeg` is available:
    ```powershell
    ffmpeg -version
    ```
-6. (Recommended) Create an admin user:
+7. (Recommended) Create an admin user:
    ```powershell
    python manage.py migrate
    python manage.py createsuperuser

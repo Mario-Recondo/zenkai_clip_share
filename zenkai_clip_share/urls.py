@@ -34,6 +34,7 @@ urlpatterns = [
     path("login/", CustomLoginView.as_view(), name="login"),
     path("logout/", CustomLogoutView.as_view(), name="logout"),
     path("clips/", include("clips.urls")),
+    path("collections/", include("shared_collections.urls")),
 ]
 
 if settings.DEBUG:

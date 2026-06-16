@@ -24,6 +24,13 @@ class Clip(models.Model):
     # placeholder when missing (extraction failure is non-fatal).
     thumbnail = models.ImageField(upload_to="clips/thumbnails", null=True, blank=True)
 
+    class Visibility(models.TextChoices):
+        PUBLIC = "PUBLIC", "Public"  # listed in the public home feed
+        UNLISTED = (
+            "UNLISTED",
+            "Unlisted",
+        )  # reachable only via collections / direct link
+
     # Explicit processing state instead of inferring it from a null file (Flaw #1/#6)
     status = models.CharField(
         max_length=10,
@@ -34,11 +41,21 @@ class Clip(models.Model):
 
     uploader = models.ForeignKey(User, on_delete=models.CASCADE)
 
+    # Whether the clip appears in the public home feed. UNLISTED clips live only
+    # inside collections (or a direct link); access is gated by can_view (later step).
+    visibility = models.CharField(
+        max_length=10,
+        choices=Visibility.choices,
+        default=Visibility.PUBLIC,
+    )
+
     class Meta:
         ordering = ["-date_uploaded"]
         indexes = [
             models.Index(fields=["-date_uploaded"]),
             models.Index(fields=["uploader", "-date_uploaded"]),
+            # Keeps the visibility-filtered home feed fast.
+            models.Index(fields=["visibility", "-date_uploaded"]),
         ]
 
     def __str__(self):
