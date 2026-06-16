@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "users.apps.UsersConfig",
     "clips",
+    "shared_collections.apps.SharedCollectionsConfig",
     "django_q",
     "storages",
 ]
