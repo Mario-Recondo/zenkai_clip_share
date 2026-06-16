@@ -129,11 +129,18 @@ def delete_clip_in_collection(collection, clip):
     Atomic + row-locked so a concurrent "add to another collection" can't race
     the "still shared?" decision. Idempotent: a repeated call unlinks 0 rows.
 
-    PRECONDITION: the caller has verified the (collection, clip) link exists.
+    PRECONDITION: the caller has verified the (collection, clip) link exists
+    (views do this via get_object_or_404). As defence-in-depth we also no-op when
+    the link is absent, so a mis-scoped call can never destroy a clip that was
+    never in this collection.
     """
     with transaction.atomic():
         clip = Clip.objects.select_for_update().get(pk=clip.pk)
-        CollectionClip.objects.filter(collection=collection, clip=clip).delete()
+        unlinked, _ = CollectionClip.objects.filter(
+            collection=collection, clip=clip
+        ).delete()
+        if not unlinked:
+            return  # clip was not in this collection — nothing to unlink or destroy
         still_shared = (
             clip.visibility == Clip.Visibility.PUBLIC
             or CollectionClip.objects.filter(clip=clip).exists()

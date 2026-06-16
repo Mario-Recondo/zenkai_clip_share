@@ -192,6 +192,26 @@ class SafeDeleteTests(TestCase):
         delete_clip_in_collection(col, clip)  # no-op, must not raise
         self.assertTrue(Clip.objects.filter(pk=clip.pk).exists())
 
+    def test_delete_on_clip_with_no_link_does_not_destroy(self):
+        # Mis-scoped call: an UNLISTED clip not in this collection (no links at all)
+        # must NOT be destroyed — the unlink removed 0 rows, so it's a no-op.
+        clip = make_clip(self.owner, Clip.Visibility.UNLISTED)
+        col = Collection.objects.create(name="A", owner=self.owner)
+        delete_clip_in_collection(col, clip)
+        self.assertTrue(Clip.objects.filter(pk=clip.pk).exists())
+
+    def test_delete_on_unlinked_clip_leaves_other_collections_intact(self):
+        # Clip lives in other_col; calling delete for col (where it isn't) is a no-op.
+        clip = make_clip(self.owner, Clip.Visibility.UNLISTED)
+        other_col = Collection.objects.create(name="Other", owner=self.owner)
+        col = Collection.objects.create(name="A", owner=self.owner)
+        add_to(other_col, clip)
+        delete_clip_in_collection(col, clip)
+        self.assertTrue(Clip.objects.filter(pk=clip.pk).exists())
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=other_col, clip=clip).exists()
+        )
+
     def test_destroy_clip_removes_row_and_links(self):
         clip = make_clip(self.owner, Clip.Visibility.PUBLIC)
         col = Collection.objects.create(name="A", owner=self.owner)
