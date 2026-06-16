@@ -338,6 +338,14 @@ class CoreLoopViewTests(TestCase):
         self.assertIn("C", names)
         self.assertNotIn(other.name, names)
 
+    def test_list_shows_clip_and_member_counts(self):
+        add_to(self.col, make_clip(self.member))
+        self.client.force_login(self.owner)
+        resp = self.client.get(reverse("collection-list"))
+        # 1 clip, and 2 members (owner + the one active member).
+        self.assertContains(resp, "1 clip")
+        self.assertContains(resp, "2 members")
+
     # --- create --------------------------------------------------------------
     def test_create_sets_owner_to_request_user(self):
         self.client.force_login(self.member)

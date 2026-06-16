@@ -20,7 +20,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -79,6 +79,15 @@ def collection_list(request):
         )
         .distinct()
         .select_related("owner")
+        .annotate(
+            clip_count=Count("collection_clips", distinct=True),
+            # Active members only; the owner is counted separately in the card.
+            member_count=Count(
+                "memberships",
+                filter=Q(memberships__status=ACTIVE),
+                distinct=True,
+            ),
+        )
         .order_by("-created_at")
     )
     page_obj = Paginator(collection_qs, PAGE_SIZE).get_page(request.GET.get("page"))

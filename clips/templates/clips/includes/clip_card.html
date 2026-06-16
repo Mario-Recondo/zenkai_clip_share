@@ -9,6 +9,14 @@
                 </svg>
             </div>
         {% endif %}
+        {% if clip.visibility == 'UNLISTED' %}
+            <span class="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-ink-950/90 px-2 py-0.5 text-xs font-medium text-ink-300" title="Only visible in collections and to people with the link">
+                <svg class="size-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.22A10.5 10.5 0 0 0 1.93 12c1.27 4.06 5.06 7 9.57 7 .99 0 1.95-.14 2.85-.4M6.23 6.23A10.45 10.45 0 0 1 11.5 5c4.51 0 8.3 2.94 9.57 7a10.52 10.52 0 0 1-4.3 5.27M6.23 6.23 3 3m3.23 3.23 3.65 3.65m7.89 7.89L21 21m-3.23-3.23-3.65-3.65m0 0a3 3 0 1 0-4.24-4.24m4.24 4.24L9.88 9.88"/>
+                </svg>
+                Unlisted
+            </span>
+        {% endif %}
         {% if clip.status == 'FAILED' %}
             <span class="js-status-badge absolute bottom-2 left-2 rounded-md bg-red-950/90 px-2 py-0.5 text-xs font-medium text-red-300">Failed</span>
         {% elif clip.status != 'READY' %}

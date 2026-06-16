@@ -409,3 +409,16 @@ class VisibilityGatingTests(TestCase):
         self.client.force_login(self.outsider)
         resp = self.client.get(reverse("clip-status", args=[self.unlisted.pk]))
         self.assertEqual(resp.status_code, 404)
+
+    # --- unlisted badge (step 7 polish) --------------------------------------
+    def test_unlisted_badge_renders_on_clip_card(self):
+        # The badge's title attribute is unique to it, so it proves the badge
+        # itself rendered (not just the clip title containing "Unlisted").
+        badge = "Only visible in collections"
+        self.client.force_login(self.uploader)
+        own = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertContains(own, badge)
+        # A public viewer never sees the uploader's unlisted clips, badge included.
+        self.client.force_login(self.outsider)
+        other = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertNotContains(other, badge)
