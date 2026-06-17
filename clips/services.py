@@ -9,14 +9,21 @@ import contextlib
 import logging
 import os
 import tempfile
+from datetime import timedelta
 
 import ffmpeg
+from django.conf import settings
 from django.core.files import File
+from django.core.files.storage import default_storage
+from django.utils import timezone
 from django_q.tasks import async_task
 
 from .models import Clip
 
 logger = logging.getLogger(__name__)
+
+# Where clip media lives in storage (mirrors the FileField upload_to paths).
+CLIP_MEDIA_PREFIXES = ("clips/raw_uploads", "clips/converted", "clips/thumbnails")
 
 
 def enqueue_transcode(clip):
@@ -149,3 +156,66 @@ def transcode_clip(clip_pk):
             if path and os.path.exists(path):
                 with contextlib.suppress(OSError):
                     os.remove(path)
+
+
+def _iter_storage_files(storage, prefix):
+    """Yield every stored object path under ``prefix`` (recursively).
+
+    Uses the storage API so it works identically on local disk and S3/R2.
+    """
+    try:
+        dirs, files = storage.listdir(prefix)
+    except FileNotFoundError:
+        return  # prefix doesn't exist yet (nothing uploaded) — nothing to walk
+    for name in files:
+        yield f"{prefix}/{name}"
+    for subdir in dirs:
+        yield from _iter_storage_files(storage, f"{prefix}/{subdir}")
+
+
+def reap_orphan_media(min_age_hours=None):
+    """Delete stored clip media objects that no live ``Clip`` row references.
+
+    The two delete paths (``delete_clip_in_collection`` / ``destroy_clip`` and
+    the upload-compensation in the collection upload view) remove the DB row
+    first and clean files up best-effort, so a storage hiccup can orphan media.
+    This scheduled reconciliation sweeps those leaks (plus any pre-existing
+    ones): it walks the clip media prefixes and deletes objects that are both
+    (a) unreferenced by any Clip FileField and (b) older than the age threshold,
+    so an in-flight upload — file written just before its row commits — is never
+    reaped. Returns the number of objects deleted.
+    """
+    if min_age_hours is None:
+        min_age_hours = getattr(settings, "ORPHAN_MEDIA_MIN_AGE_HOURS", 6)
+
+    storage = default_storage
+    # Every file name referenced by a live Clip, across all three FileFields.
+    referenced = set()
+    for names in Clip.objects.values_list(
+        "video_file", "converted_video_file", "thumbnail"
+    ):
+        referenced.update(name for name in names if name)
+
+    cutoff = timezone.now() - timedelta(hours=min_age_hours)
+    deleted = 0
+    for prefix in CLIP_MEDIA_PREFIXES:
+        for name in _iter_storage_files(storage, prefix):
+            if name in referenced:
+                continue
+            try:
+                modified = storage.get_modified_time(name)
+            except (NotImplementedError, OSError):
+                continue  # can't determine age — leave it for a later pass
+            if timezone.is_naive(modified):
+                modified = timezone.make_aware(modified)
+            if modified > cutoff:
+                continue  # too new — could be an upload mid-commit
+            try:
+                storage.delete(name)
+                deleted += 1
+                logger.info("orphan reaper: deleted unreferenced media %s", name)
+            except Exception:
+                logger.exception("orphan reaper: failed to delete %s", name)
+
+    logger.info("orphan reaper: removed %s orphaned media object(s)", deleted)
+    return deleted
