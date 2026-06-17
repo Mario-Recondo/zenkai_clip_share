@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold tracking-tight">My invites</h1>
+    <p class="mt-1 text-sm text-ink-400">Pending invitations to join collections.</p>
+
+    {% if invites %}
+        <ul class="mt-6 space-y-3">
+            {% for invite in invites %}
+                <li class="card flex flex-wrap items-center justify-between gap-4 p-5">
+                    <div class="min-w-0">
+                        <p class="font-semibold tracking-tight">{{ invite.collection.name }}</p>
+                        <p class="text-sm text-ink-400">
+                            Invited by {{ invite.collection.owner.username }}
+                            <span aria-hidden="true">&middot;</span>
+                            {{ invite.invited_at|date:"M j, Y" }}
+                        </p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <form method="post" action="{% url 'invite-decline' invite.collection.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost">Decline</button>
+                        </form>
+                        <form method="post" action="{% url 'invite-accept' invite.collection.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary">Accept</button>
+                        </form>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="card mt-6 flex flex-col items-center gap-2 px-6 py-16 text-center">
+            <p class="font-medium text-ink-300">No pending invites</p>
+            <p class="text-sm text-ink-400">When someone invites you to a collection, it shows up here.</p>
+        </div>
+    {% endif %}
+{% endblock %}

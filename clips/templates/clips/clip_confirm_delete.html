@@ -4,18 +4,55 @@
     <div class="mx-auto max-w-md">
         <div class="card p-6">
             <h1 class="text-xl font-semibold tracking-tight">Delete this clip?</h1>
-            <p class="mt-2 text-sm text-ink-400">
-                &ldquo;{{ clip.title }}&rdquo; and its video files will be permanently deleted.
-                This cannot be undone.
-            </p>
+
             {% if clip.thumbnail %}
                 <img src="{{ clip.thumbnail.url }}" alt="" class="mt-4 aspect-video w-full rounded-lg border border-ink-700 object-cover">
             {% endif %}
-            <form method="post" class="mt-6 flex gap-3">
-                {% csrf_token %}
-                <a href="{% url 'clip-detail' clip.pk %}" class="btn btn-secondary flex-1">Cancel</a>
-                <button type="submit" class="btn btn-danger flex-1">Delete clip</button>
-            </form>
+
+            {% if collections %}
+                <p class="mt-4 text-sm text-ink-400">
+                    &ldquo;{{ clip.title }}&rdquo; is in
+                    {{ collections|length }} collection{{ collections|length|pluralize }}:
+                    {% for collection in collections %}<span class="font-medium text-ink-200">{{ collection.name }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
+                    Choose what to do.
+                </p>
+
+                <form method="post" class="form-stack mt-5">
+                    {% csrf_token %}
+                    <fieldset class="space-y-3">
+                        <label class="flex gap-3 rounded-lg border border-ink-700 bg-ink-900 p-3">
+                            <input type="radio" name="action" value="unpublish" checked class="mt-1">
+                            <span class="text-sm">
+                                <span class="block font-medium text-ink-100">Unpublish (make private everywhere)</span>
+                                <span class="block text-ink-400">Removes the clip from the home feed, your public profile, and existing public links. It stays in your collections so members keep access.</span>
+                            </span>
+                        </label>
+                        <label class="flex gap-3 rounded-lg border border-red-900 bg-red-950/30 p-3">
+                            <input type="radio" name="action" value="delete_everywhere" class="mt-1">
+                            <span class="text-sm">
+                                <span class="block font-medium text-red-300">Delete everywhere</span>
+                                <span class="block text-ink-400">Permanently deletes the clip and its files, and removes it from every collection. This affects other members and cannot be undone.</span>
+                            </span>
+                        </label>
+                    </fieldset>
+
+                    <div class="mt-6 flex gap-3">
+                        <a href="{% url 'clip-detail' clip.pk %}" class="btn btn-secondary flex-1">Cancel</a>
+                        <button type="submit" class="btn btn-danger flex-1">Confirm</button>
+                    </div>
+                </form>
+            {% else %}
+                <p class="mt-2 text-sm text-ink-400">
+                    &ldquo;{{ clip.title }}&rdquo; and its video files will be permanently deleted.
+                    This cannot be undone.
+                </p>
+                <form method="post" class="mt-6 flex gap-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_everywhere">
+                    <a href="{% url 'clip-detail' clip.pk %}" class="btn btn-secondary flex-1">Cancel</a>
+                    <button type="submit" class="btn btn-danger flex-1">Delete clip</button>
+                </form>
+            {% endif %}
         </div>
     </div>
 {% endblock %}

@@ -1,11 +1,21 @@
 import os
 import tempfile
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
+
+from shared_collections.models import (
+    Collection,
+    CollectionClip,
+    CollectionMembership,
+)
 
 from .models import Clip
 
@@ -30,14 +40,16 @@ class ClipUploadFlowTests(TestCase):
         video = SimpleUploadedFile(
             "clip.mp4", b"\x00\x01fake", content_type="video/mp4"
         )
-        resp = self.client.post(
-            reverse("clip-create"),
-            {"title": "Ace", "description": "clutch", "video_file": video},
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(
+                reverse("clip-create"),
+                {"title": "Ace", "description": "clutch", "video_file": video},
+            )
         self.assertEqual(resp.status_code, 302)
         clip = Clip.objects.get()
         self.assertEqual(clip.status, Clip.Status.PENDING)
         self.assertEqual(clip.uploader, self.user)
+        # Enqueue is gated on commit so a rolled-back upload never queues a job.
         enqueue.assert_called_once_with(clip)
 
     @mock.patch("clips.views.enqueue_transcode")
@@ -46,11 +58,12 @@ class ClipUploadFlowTests(TestCase):
         video = SimpleUploadedFile(
             "clip.mp4", b"\x00\x01fake", content_type="video/mp4"
         )
-        resp = self.client.post(
-            reverse("clip-create"),
-            {"title": "Ace", "description": "", "video_file": video},
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(
+                reverse("clip-create"),
+                {"title": "Ace", "description": "", "video_file": video},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["redirect"], reverse("clip-list"))
         enqueue.assert_called_once()
@@ -181,7 +194,10 @@ class ClipDeleteTests(TestCase):
         raw_path = self.clip.video_file.path
         self.assertTrue(os.path.exists(raw_path))
         self.client.force_login(self.owner)
-        resp = self.client.post(reverse("clip-delete", args=[self.clip.pk]))
+        # File cleanup runs on commit (destroy_clip queues it via on_commit), so
+        # capture and execute the callbacks to observe the storage delete.
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(reverse("clip-delete", args=[self.clip.pk]))
         self.assertRedirects(resp, reverse("clip-list"))
         self.assertFalse(Clip.objects.filter(pk=self.clip.pk).exists())
         self.assertFalse(os.path.exists(raw_path))
@@ -289,3 +305,169 @@ class TranscodeTaskTests(TestCase):
         clip.refresh_from_db()
         self.assertEqual(clip.status, Clip.Status.FAILED)
         self.assertIn("boom", clip.error_message)
+
+
+@_TEST_OVERRIDES
+class VisibilityGatingTests(TestCase):
+    """Step-4 access boundaries: PUBLIC clips stay world-viewable; UNLISTED clips
+    are hidden from the home feed, public listings, and detail/status for anyone
+    but the uploader and active members."""
+
+    def setUp(self):
+        self.uploader = User.objects.create_user("uploader", password="pw")
+        self.member = User.objects.create_user("member", password="pw")
+        self.outsider = User.objects.create_user("outsider", password="pw")
+        self.public = Clip.objects.create(
+            title="Public play",
+            uploader=self.uploader,
+            video_file=SimpleUploadedFile("p.mp4", b"x"),
+            visibility=Clip.Visibility.PUBLIC,
+        )
+        self.unlisted = Clip.objects.create(
+            title="Unlisted play",
+            uploader=self.uploader,
+            video_file=SimpleUploadedFile("u.mp4", b"x"),
+            visibility=Clip.Visibility.UNLISTED,
+        )
+
+    def _share_unlisted_with_member(self):
+        col = Collection.objects.create(name="C", owner=self.uploader)
+        membership = CollectionMembership.objects.create(
+            collection=col,
+            user=self.member,
+            status=CollectionMembership.Status.ACTIVE,
+        )
+        CollectionClip.objects.create(
+            collection=col, clip=self.unlisted, added_by=self.uploader
+        )
+        return col, membership
+
+    # --- home feed -----------------------------------------------------------
+    def test_home_feed_hides_unlisted_shows_public(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("clip-list"))
+        self.assertContains(resp, "Public play")
+        self.assertNotContains(resp, "Unlisted play")
+
+    # --- uploader listing ----------------------------------------------------
+    def test_uploader_sees_own_unlisted_on_their_page(self):
+        self.client.force_login(self.uploader)
+        resp = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertContains(resp, "Public play")
+        self.assertContains(resp, "Unlisted play")
+
+    def test_other_viewer_sees_only_public_on_listing(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertContains(resp, "Public play")
+        self.assertNotContains(resp, "Unlisted play")
+
+    def test_anonymous_sees_only_public_on_listing(self):
+        resp = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertContains(resp, "Public play")
+        self.assertNotContains(resp, "Unlisted play")
+
+    # --- detail gate ---------------------------------------------------------
+    def test_public_detail_viewable_anonymously(self):
+        resp = self.client.get(reverse("clip-detail", args=[self.public.pk]))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_unlisted_detail_404_for_anonymous_and_outsider(self):
+        resp = self.client.get(reverse("clip-detail", args=[self.unlisted.pk]))
+        self.assertEqual(resp.status_code, 404)
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("clip-detail", args=[self.unlisted.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_unlisted_detail_200_for_uploader_and_active_member(self):
+        self._share_unlisted_with_member()
+        for user in (self.uploader, self.member):
+            self.client.force_login(user)
+            resp = self.client.get(reverse("clip-detail", args=[self.unlisted.pk]))
+            self.assertEqual(resp.status_code, 200)
+
+    def test_ex_member_loses_detail_access(self):
+        _col, membership = self._share_unlisted_with_member()
+        self.client.force_login(self.member)
+        self.assertEqual(
+            self.client.get(
+                reverse("clip-detail", args=[self.unlisted.pk])
+            ).status_code,
+            200,
+        )
+        membership.delete()
+        self.assertEqual(
+            self.client.get(
+                reverse("clip-detail", args=[self.unlisted.pk])
+            ).status_code,
+            404,
+        )
+
+    # --- status gate ---------------------------------------------------------
+    def test_public_status_returns_json_to_anonymous(self):
+        resp = self.client.get(reverse("clip-status", args=[self.public.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["status"], Clip.Status.PENDING)
+
+    def test_unlisted_status_404_for_outsider(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("clip-status", args=[self.unlisted.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    # --- unlisted badge (step 7 polish) --------------------------------------
+    def test_unlisted_badge_renders_on_clip_card(self):
+        # The badge's title attribute is unique to it, so it proves the badge
+        # itself rendered (not just the clip title containing "Unlisted").
+        badge = "Only visible in collections"
+        self.client.force_login(self.uploader)
+        own = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertContains(own, badge)
+        # A public viewer never sees the uploader's unlisted clips, badge included.
+        self.client.force_login(self.outsider)
+        other = self.client.get(reverse("user-clips", args=[self.uploader.username]))
+        self.assertNotContains(other, badge)
+
+
+@_TEST_OVERRIDES
+class OrphanReaperTests(TestCase):
+    """Step-8 storage hygiene: the scheduled reaper deletes unreferenced media
+    older than the age threshold, and never touches referenced or fresh files."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("janitor", password="pw")
+
+    def _save_aged(self, name, age_hours):
+        """Save a file under storage and backdate its mtime by age_hours."""
+        stored = default_storage.save(name, ContentFile(b"x"))
+        old = (timezone.now() - timedelta(hours=age_hours)).timestamp()
+        os.utime(default_storage.path(stored), (old, old))
+        return stored
+
+    def test_old_orphan_is_deleted(self):
+        from clips import services
+
+        name = self._save_aged("clips/raw_uploads/orphan.mp4", age_hours=48)
+        deleted = services.reap_orphan_media(min_age_hours=6)
+        self.assertEqual(deleted, 1)
+        self.assertFalse(default_storage.exists(name))
+
+    def test_referenced_file_is_kept_even_when_old(self):
+        from clips import services
+
+        clip = Clip.objects.create(
+            title="Real",
+            uploader=self.user,
+            video_file=SimpleUploadedFile("real.mp4", b"x"),
+        )
+        old = (timezone.now() - timedelta(hours=48)).timestamp()
+        os.utime(default_storage.path(clip.video_file.name), (old, old))
+        services.reap_orphan_media(min_age_hours=6)
+        self.assertTrue(default_storage.exists(clip.video_file.name))
+
+    def test_recent_orphan_is_kept(self):
+        from clips import services
+
+        name = self._save_aged("clips/raw_uploads/fresh.mp4", age_hours=1)
+        deleted = services.reap_orphan_media(min_age_hours=6)
+        self.assertEqual(deleted, 0)
+        self.assertTrue(default_storage.exists(name))

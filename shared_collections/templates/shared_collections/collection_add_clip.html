@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight">Add a clip</h1>
+            <p class="mt-1 text-sm text-ink-400">Pick one of your clips to add to {{ collection.name }}.</p>
+        </div>
+        <a href="{% url 'collection-detail' collection.pk %}" class="btn btn-secondary shrink-0">Done</a>
+    </div>
+
+    {% if clips %}
+        <div class="mt-6 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+            {% for clip in clips %}
+                <div>
+                    {% include "clips/includes/clip_card.html" %}
+                    <form method="post" action="{% url 'collection-add-clip' collection.pk %}" class="mt-2">
+                        {% csrf_token %}
+                        <input type="hidden" name="clip" value="{{ clip.pk }}">
+                        <button type="submit" class="btn btn-secondary w-full px-2 py-1 text-xs">Add to collection</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card mt-6 flex flex-col items-center gap-2 px-6 py-16 text-center">
+            <p class="font-medium text-ink-300">Nothing to add</p>
+            <p class="text-sm text-ink-400">All your clips are already in this collection, or you haven't uploaded any yet.</p>
+            <a href="{% url 'collection-upload' collection.pk %}" class="btn btn-primary mt-3">Upload a new clip</a>
+        </div>
+    {% endif %}
+
+    {% include "clips/includes/pagination.html" %}
+{% endblock %}

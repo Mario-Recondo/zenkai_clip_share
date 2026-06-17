@@ -1,11 +1,13 @@
 import tempfile
 import threading
 from unittest import skipUnless
+from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection, connections, transaction
 from django.test import TestCase, TransactionTestCase, override_settings
+from django.urls import reverse
 
 from clips.models import Clip
 
@@ -289,3 +291,437 @@ class ConcurrencyTests(TransactionTestCase):
         else:
             # delete won: no dangling links to a destroyed clip
             self.assertEqual(CollectionClip.objects.filter(clip_id=clip_id).count(), 0)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class CoreLoopViewTests(TestCase):
+    """Step-3 view tests: create / list / detail gate / upload / add / unlink /
+    safe-delete / delete-collection."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user("owner", password="pw")
+        cls.member = User.objects.create_user("member", password="pw")
+        cls.outsider = User.objects.create_user("outsider", password="pw")
+
+    def setUp(self):
+        self.col = Collection.objects.create(name="C", owner=self.owner)
+        self.membership = CollectionMembership.objects.create(
+            collection=self.col, user=self.member, status=ACTIVE
+        )
+
+    # --- detail gate ---------------------------------------------------------
+    def test_non_member_gets_404_on_detail(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.get(reverse("collection-detail", args=[self.col.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_active_member_and_owner_get_200_on_detail(self):
+        for user in (self.owner, self.member):
+            self.client.force_login(user)
+            resp = self.client.get(reverse("collection-detail", args=[self.col.pk]))
+            self.assertEqual(resp.status_code, 200)
+
+    def test_pending_member_gets_404_on_detail(self):
+        self.membership.status = PENDING
+        self.membership.save()
+        self.client.force_login(self.member)
+        resp = self.client.get(reverse("collection-detail", args=[self.col.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    # --- list ----------------------------------------------------------------
+    def test_list_shows_owned_and_joined_only(self):
+        other = Collection.objects.create(name="Other", owner=self.outsider)
+        self.client.force_login(self.member)
+        resp = self.client.get(reverse("collection-list"))
+        names = [c.name for c in resp.context["collections"]]
+        self.assertIn("C", names)
+        self.assertNotIn(other.name, names)
+
+    def test_list_shows_clip_and_member_counts(self):
+        add_to(self.col, make_clip(self.member))
+        self.client.force_login(self.owner)
+        resp = self.client.get(reverse("collection-list"))
+        # 1 clip, and 2 members (owner + the one active member).
+        self.assertContains(resp, "1 clip")
+        self.assertContains(resp, "2 members")
+
+    # --- create --------------------------------------------------------------
+    def test_create_sets_owner_to_request_user(self):
+        self.client.force_login(self.member)
+        resp = self.client.post(
+            reverse("collection-create"), {"name": "Squad", "description": ""}
+        )
+        created = Collection.objects.get(name="Squad")
+        self.assertEqual(created.owner, self.member)
+        self.assertRedirects(resp, reverse("collection-detail", args=[created.pk]))
+
+    # --- upload-into-collection ----------------------------------------------
+    @patch("shared_collections.views.enqueue_transcode")
+    @patch("clips.forms.ClipCreateForm._probe_duration", return_value=10.0)
+    def test_upload_creates_unlisted_clip_linked_and_enqueues(self, _probe, enqueue):
+        self.client.force_login(self.member)
+        video = SimpleUploadedFile("c.mp4", b"data", content_type="video/mp4")
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(
+                reverse("collection-upload", args=[self.col.pk]),
+                {"title": "Play", "description": "", "video_file": video},
+            )
+        clip = Clip.objects.get(title="Play")
+        self.assertEqual(clip.uploader, self.member)
+        self.assertEqual(clip.visibility, Clip.Visibility.UNLISTED)
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=self.col, clip=clip).exists()
+        )
+        enqueue.assert_called_once_with(clip)
+        self.assertRedirects(resp, reverse("collection-detail", args=[self.col.pk]))
+
+    @patch("shared_collections.views.enqueue_transcode")
+    @patch("clips.forms.ClipCreateForm._probe_duration", return_value=10.0)
+    def test_upload_post_to_home_makes_clip_public(self, _probe, _enqueue):
+        self.client.force_login(self.member)
+        video = SimpleUploadedFile("c.mp4", b"data", content_type="video/mp4")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("collection-upload", args=[self.col.pk]),
+                {
+                    "title": "Public play",
+                    "description": "",
+                    "video_file": video,
+                    "post_to_home": "on",
+                },
+            )
+        clip = Clip.objects.get(title="Public play")
+        self.assertEqual(clip.visibility, Clip.Visibility.PUBLIC)
+        # Still linked to the collection as well as posted to the feed.
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=self.col, clip=clip).exists()
+        )
+
+    # --- add existing own clip -----------------------------------------------
+    def test_member_can_add_own_clip(self):
+        clip = make_clip(self.member)
+        self.client.force_login(self.member)
+        self.client.post(
+            reverse("collection-add-clip", args=[self.col.pk]), {"clip": clip.pk}
+        )
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=self.col, clip=clip).exists()
+        )
+
+    def test_member_cannot_add_someone_elses_clip(self):
+        others_clip = make_clip(self.outsider)
+        self.client.force_login(self.member)
+        resp = self.client.post(
+            reverse("collection-add-clip", args=[self.col.pk]),
+            {"clip": others_clip.pk},
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(CollectionClip.objects.filter(clip=others_clip).exists())
+
+    # --- unlink --------------------------------------------------------------
+    def test_remove_clip_unlinks_but_keeps_row(self):
+        clip = make_clip(self.member, Clip.Visibility.UNLISTED)
+        add_to(self.col, clip)
+        self.client.force_login(self.member)
+        self.client.post(reverse("collection-remove-clip", args=[self.col.pk, clip.pk]))
+        self.assertTrue(Clip.objects.filter(pk=clip.pk).exists())
+        self.assertFalse(
+            CollectionClip.objects.filter(collection=self.col, clip=clip).exists()
+        )
+
+    def test_remove_clip_requires_can_unlink(self):
+        clip = make_clip(self.member)
+        add_to(self.col, clip)
+        stranger = User.objects.create_user("stranger", password="pw")
+        CollectionMembership.objects.create(
+            collection=self.col, user=stranger, status=ACTIVE
+        )
+        self.client.force_login(stranger)
+        resp = self.client.post(
+            reverse("collection-remove-clip", args=[self.col.pk, clip.pk])
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=self.col, clip=clip).exists()
+        )
+
+    # --- safe-delete via the view --------------------------------------------
+    def test_delete_clip_destroys_sole_home(self):
+        clip = make_clip(self.member, Clip.Visibility.UNLISTED)
+        add_to(self.col, clip)
+        self.client.force_login(self.member)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("collection-delete-clip", args=[self.col.pk, clip.pk])
+            )
+        self.assertFalse(Clip.objects.filter(pk=clip.pk).exists())
+
+    def test_delete_clip_link_scoped_boundary(self):
+        # A clip that lives only in another collection must not be destroyable
+        # through this one — even by a caller who would otherwise pass can_delete.
+        other = Collection.objects.create(name="Other", owner=self.owner)
+        clip = make_clip(self.owner, Clip.Visibility.UNLISTED)
+        add_to(other, clip)
+        self.client.force_login(self.owner)
+        resp = self.client.post(
+            reverse("collection-delete-clip", args=[self.col.pk, clip.pk])
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertTrue(Clip.objects.filter(pk=clip.pk).exists())
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=other, clip=clip).exists()
+        )
+
+    # --- delete collection ---------------------------------------------------
+    def test_delete_collection_unlinks_clips_without_destroying(self):
+        clip = make_clip(self.member, Clip.Visibility.UNLISTED)
+        add_to(self.col, clip)
+        self.client.force_login(self.owner)
+        self.client.post(reverse("collection-delete", args=[self.col.pk]))
+        self.assertFalse(Collection.objects.filter(pk=self.col.pk).exists())
+        self.assertTrue(Clip.objects.filter(pk=clip.pk).exists())
+        self.assertEqual(CollectionClip.objects.filter(clip=clip).count(), 0)
+
+    def test_only_owner_can_delete_collection(self):
+        self.client.force_login(self.member)
+        resp = self.client.post(reverse("collection-delete", args=[self.col.pk]))
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(Collection.objects.filter(pk=self.col.pk).exists())
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class CollectionAwareClipDeleteTests(TestCase):
+    """The My-clips ClipDeleteView routes through destroy_clip and offers the
+    non-destructive 'unpublish' path for clips that live in a collection."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user("owner", password="pw")
+
+    def test_unpublish_keeps_clip_in_collection_and_sets_unlisted(self):
+        clip = make_clip(self.owner, Clip.Visibility.PUBLIC)
+        col = Collection.objects.create(name="C", owner=self.owner)
+        add_to(col, clip)
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("clip-delete", args=[clip.pk]), {"action": "unpublish"}
+        )
+        clip.refresh_from_db()
+        self.assertEqual(clip.visibility, Clip.Visibility.UNLISTED)
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=col, clip=clip).exists()
+        )
+
+    def test_delete_everywhere_destroys_and_unlinks(self):
+        clip = make_clip(self.owner, Clip.Visibility.PUBLIC)
+        col = Collection.objects.create(name="C", owner=self.owner)
+        add_to(col, clip)
+        self.client.force_login(self.owner)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("clip-delete", args=[clip.pk]),
+                {"action": "delete_everywhere"},
+            )
+        self.assertFalse(Clip.objects.filter(pk=clip.pk).exists())
+        self.assertEqual(CollectionClip.objects.filter(clip=clip).count(), 0)
+
+    def test_clip_in_no_collection_is_destroyed(self):
+        clip = make_clip(self.owner, Clip.Visibility.PUBLIC)
+        self.client.force_login(self.owner)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("clip-delete", args=[clip.pk]),
+                {"action": "delete_everywhere"},
+            )
+        self.assertFalse(Clip.objects.filter(pk=clip.pk).exists())
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class MembershipLifecycleViewTests(TestCase):
+    """Step-5 sharing: invite by username, accept / decline, leave, remove-member."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user("owner", password="pw")
+        cls.invitee = User.objects.create_user("invitee", password="pw")
+        cls.outsider = User.objects.create_user("outsider", password="pw")
+
+    def setUp(self):
+        self.col = Collection.objects.create(name="C", owner=self.owner)
+
+    def _membership(self):
+        return CollectionMembership.objects.filter(
+            collection=self.col, user=self.invitee
+        ).first()
+
+    # --- invite --------------------------------------------------------------
+    def test_owner_invites_by_username_creates_pending(self):
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("collection-invite", args=[self.col.pk]),
+            {"username": "invitee"},
+        )
+        m = self._membership()
+        self.assertIsNotNone(m)
+        self.assertEqual(m.status, PENDING)
+
+    def test_non_owner_cannot_invite(self):
+        self.client.force_login(self.invitee)
+        resp = self.client.post(
+            reverse("collection-invite", args=[self.col.pk]),
+            {"username": "outsider"},
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(
+            CollectionMembership.objects.filter(collection=self.col).exists()
+        )
+
+    def test_self_invite_rejected(self):
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("collection-invite", args=[self.col.pk]),
+            {"username": "owner"},
+        )
+        self.assertFalse(
+            CollectionMembership.objects.filter(
+                collection=self.col, user=self.owner
+            ).exists()
+        )
+
+    def test_duplicate_invite_does_not_create_second_row(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=PENDING
+        )
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("collection-invite", args=[self.col.pk]),
+            {"username": "invitee"},
+        )
+        self.assertEqual(
+            CollectionMembership.objects.filter(
+                collection=self.col, user=self.invitee
+            ).count(),
+            1,
+        )
+
+    # --- accept / decline ----------------------------------------------------
+    def test_accept_sets_active_and_joined_at(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=PENDING
+        )
+        self.client.force_login(self.invitee)
+        resp = self.client.post(reverse("invite-accept", args=[self.col.pk]))
+        m = self._membership()
+        self.assertEqual(m.status, ACTIVE)
+        self.assertIsNotNone(m.joined_at)
+        self.assertRedirects(resp, reverse("collection-detail", args=[self.col.pk]))
+
+    def test_decline_deletes_the_invite(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=PENDING
+        )
+        self.client.force_login(self.invitee)
+        self.client.post(reverse("invite-decline", args=[self.col.pk]))
+        self.assertIsNone(self._membership())
+
+    def test_accept_404_when_no_pending_invite(self):
+        self.client.force_login(self.invitee)
+        resp = self.client.post(reverse("invite-accept", args=[self.col.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_my_invites_lists_pending_only(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=PENDING
+        )
+        active_col = Collection.objects.create(name="Active", owner=self.owner)
+        CollectionMembership.objects.create(
+            collection=active_col, user=self.invitee, status=ACTIVE
+        )
+        self.client.force_login(self.invitee)
+        resp = self.client.get(reverse("my-invites"))
+        self.assertContains(resp, "C")
+        self.assertNotContains(resp, "Active")
+
+    # --- leave ---------------------------------------------------------------
+    def test_active_member_can_leave(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=ACTIVE
+        )
+        self.client.force_login(self.invitee)
+        resp = self.client.post(reverse("collection-leave", args=[self.col.pk]))
+        self.assertIsNone(self._membership())
+        self.assertRedirects(resp, reverse("collection-list"))
+
+    def test_owner_cannot_leave(self):
+        self.client.force_login(self.owner)
+        resp = self.client.post(reverse("collection-leave", args=[self.col.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    # --- remove member -------------------------------------------------------
+    def test_owner_removes_member_clip_stays_and_owner_gains_delete(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=ACTIVE
+        )
+        clip = make_clip(self.invitee, Clip.Visibility.UNLISTED)
+        add_to(self.col, clip)
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("collection-remove-member", args=[self.col.pk, self.invitee.pk])
+        )
+        self.assertIsNone(self._membership())
+        # Ex-member's clip stays linked; owner now passes can_delete over it (#9).
+        self.assertTrue(
+            CollectionClip.objects.filter(collection=self.col, clip=clip).exists()
+        )
+        self.assertTrue(can_delete(self.col, self.owner, clip))
+
+    def test_non_owner_cannot_remove_member(self):
+        CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=ACTIVE
+        )
+        self.client.force_login(self.invitee)
+        resp = self.client.post(
+            reverse("collection-remove-member", args=[self.col.pk, self.owner.pk])
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    # --- allow_owner_delete toggle (step 6) ----------------------------------
+    def test_member_opts_owner_in_then_out(self):
+        m = CollectionMembership.objects.create(
+            collection=self.col, user=self.invitee, status=ACTIVE
+        )
+        clip = make_clip(self.invitee, Clip.Visibility.UNLISTED)
+        add_to(self.col, clip)
+        self.assertFalse(can_delete(self.col, self.owner, clip))  # default off
+
+        self.client.force_login(self.invitee)
+        self.client.post(
+            reverse("membership-settings", args=[self.col.pk]),
+            {"allow_owner_delete": "on"},
+        )
+        m.refresh_from_db()
+        self.assertTrue(m.allow_owner_delete)
+        self.assertTrue(can_delete(self.col, self.owner, clip))
+
+        # Unchecked checkbox sends no value -> opts the owner back out.
+        self.client.post(reverse("membership-settings", args=[self.col.pk]), {})
+        m.refresh_from_db()
+        self.assertFalse(m.allow_owner_delete)
+        self.assertFalse(can_delete(self.col, self.owner, clip))
+
+    def test_owner_cannot_use_membership_settings(self):
+        self.client.force_login(self.owner)
+        resp = self.client.post(
+            reverse("membership-settings", args=[self.col.pk]),
+            {"allow_owner_delete": "on"},
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_non_member_cannot_use_membership_settings(self):
+        self.client.force_login(self.outsider)
+        resp = self.client.post(
+            reverse("membership-settings", args=[self.col.pk]),
+            {"allow_owner_delete": "on"},
+        )
+        self.assertEqual(resp.status_code, 404)

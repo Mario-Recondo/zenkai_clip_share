@@ -2,11 +2,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView
+
+from shared_collections.permissions import can_view, destroy_clip
 
 from .forms import (
     ALLOWED_EXTENSIONS,
@@ -23,8 +26,14 @@ PAGE_SIZE = 12
 # Create your views here.
 @login_required
 def clip_list(request):
+    # Public home feed: UNLISTED clips live only inside collections / direct
+    # links, so they must never surface here.
     # select_related avoids an N+1 on clip.uploader.username (Flaw #4)
-    clip_qs = Clip.objects.select_related("uploader").order_by("-date_uploaded")
+    clip_qs = (
+        Clip.objects.filter(visibility=Clip.Visibility.PUBLIC)
+        .select_related("uploader")
+        .order_by("-date_uploaded")
+    )
     query = request.GET.get("q", "").strip()
     if query:
         clip_qs = clip_qs.filter(
@@ -44,6 +53,11 @@ def clip_list(request):
 
 def clip_detail(request, pk):
     clip = get_object_or_404(Clip.objects.select_related("uploader"), pk=pk)
+    # Conditional gate (NOT @login_required): can_view returns True for PUBLIC
+    # clips so they stay anonymously viewable; UNLISTED clips are restricted to
+    # the uploader / active members, everyone else gets a 404.
+    if not can_view(clip, request.user):
+        raise Http404("No clip matches the given query.")
     return render(
         request, "clips/clip_detail.html", {"clip": clip, "title": clip.title}
     )
@@ -51,7 +65,15 @@ def clip_detail(request, pk):
 
 def clip_status(request, pk):
     """Tiny JSON endpoint polled by the frontend while a clip transcodes."""
-    clip = get_object_or_404(Clip.objects.only("status", "thumbnail"), pk=pk)
+    # Load the fields can_view needs alongside the status payload, so the gate
+    # doesn't trigger extra queries.
+    clip = get_object_or_404(
+        Clip.objects.only("status", "thumbnail", "visibility", "uploader"), pk=pk
+    )
+    # Same conditional gate as clip_detail: PUBLIC clips keep returning JSON to
+    # anonymous pollers; UNLISTED ones 404 for non-uploaders / non-members.
+    if not can_view(clip, request.user):
+        raise Http404("No clip matches the given query.")
     return JsonResponse(
         {
             "status": clip.status,
@@ -85,9 +107,11 @@ class ClipCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.uploader = self.request.user
-        response = super().form_valid(form)
-        # Hand transcoding off to the worker instead of blocking the request (Flaw #1)
-        enqueue_transcode(self.object)
+        # Save the row (and file) inside a transaction and enqueue only after it
+        # commits, so a rolled-back clip can never leave a queued transcode job.
+        with transaction.atomic():
+            response = super().form_valid(form)
+        transaction.on_commit(lambda: enqueue_transcode(self.object))
         if self._is_ajax(self.request):
             return JsonResponse({"redirect": str(self.get_success_url())})
         return response
@@ -99,6 +123,21 @@ class ClipCreateView(LoginRequiredMixin, CreateView):
 
 
 class ClipDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """Collection-aware My-clips delete.
+
+    When the clip lives in 1+ collections the confirm page offers two choices:
+
+    - **Unpublish** (default, non-destructive): set ``visibility = UNLISTED``.
+      This is a *global* change — the clip leaves every public surface at once
+      (home feed, the public uploader listing, anonymous detail/status links) but
+      stays in its shared collections so members keep access.
+    - **Delete everywhere** (destructive): route through ``destroy_clip`` so the
+      single full-destroy entry point — and never a silent bypass — removes the
+      row, cascades all collection links, and cleans up files.
+
+    A clip in no collection has only the destructive path (today's behaviour).
+    """
+
     model = Clip
     template_name = "clips/clip_confirm_delete.html"
     success_url = reverse_lazy("clip-list")
@@ -107,17 +146,21 @@ class ClipDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         # Only the uploader may delete their clip (403 otherwise).
         return self.get_object().uploader == self.request.user
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["collections"] = list(self.object.collections.all())
+        return context
+
     def form_valid(self, form):
-        # Capture file refs before the row disappears, then clean up storage.
-        # Row first so a storage hiccup can only orphan files, never resurrect
-        # a deleted clip.
         clip = self.object
-        files = [clip.video_file, clip.converted_video_file, clip.thumbnail]
-        response = super().form_valid(form)
-        for f in files:
-            if f:
-                f.delete(save=False)
-        return response
+        if self.request.POST.get("action") == "unpublish":
+            # Non-destructive: drop from public surfaces, keep in collections.
+            clip.visibility = Clip.Visibility.UNLISTED
+            clip.save(update_fields=["visibility"])
+        else:
+            # The only full-destroy entry point (cascades links + cleans files).
+            destroy_clip(clip)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 # view to display a single users clips
@@ -128,6 +171,12 @@ def user_clips(request, username):
         .select_related("uploader")
         .order_by("-date_uploaded")
     )
+    # Public listing: only the owner viewing their own page sees their UNLISTED
+    # clips. Any other viewer (incl. anonymous) sees just this user's PUBLIC
+    # clips — and the owner's own page is the safety net that always reaches a
+    # clip unlinked from every collection.
+    if request.user != user:
+        clip_qs = clip_qs.filter(visibility=Clip.Visibility.PUBLIC)
     page_obj = Paginator(clip_qs, PAGE_SIZE).get_page(request.GET.get("page"))
     context = {
         "user_object": user,
