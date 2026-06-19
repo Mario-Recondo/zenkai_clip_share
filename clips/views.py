@@ -4,7 +4,12 @@ from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
-from django.http import Http404, HttpResponseRedirect, JsonResponse
+from django.http import (
+    Http404,
+    HttpResponseBadRequest,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView
@@ -155,13 +160,19 @@ class ClipDeleteView(LoginRequiredMixin, DeleteView):
 
     def form_valid(self, form):
         clip = self.object
-        if self.request.POST.get("action") == "unpublish":
+        action = self.request.POST.get("action")
+        if action == "unpublish":
             # Non-destructive: drop from public surfaces, keep in collections.
             clip.visibility = Clip.Visibility.UNLISTED
             clip.save(update_fields=["visibility"])
-        else:
+        elif action == "delete_everywhere":
             # The only full-destroy entry point (cascades links + cleans files).
             destroy_clip(clip)
+        else:
+            # Fail safe, never fail destructive: a missing or unknown action must
+            # NOT default into permanent deletion. The confirm template always
+            # submits an explicit action, so this only triggers on tampering.
+            return HttpResponseBadRequest("Unknown delete action.")
         return HttpResponseRedirect(self.get_success_url())
 
 
