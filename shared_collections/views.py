@@ -264,7 +264,14 @@ def collection_add_clip(request, pk):
     )
 
     if request.method == "POST":
-        clip = get_object_or_404(Clip, pk=request.POST.get("clip"))
+        # Parse the posted id first: feeding a non-numeric value straight into an
+        # integer-pk lookup raises ValueError (a 500), not the concealed 404 we
+        # want for a bad/forged clip id.
+        try:
+            clip_pk = int(request.POST.get("clip"))
+        except (TypeError, ValueError):
+            raise Http404("No clip matches the given query.") from None
+        clip = get_object_or_404(Clip, pk=clip_pk)
         # Members may add only their own clips — keeps added_by == uploader.
         if clip.uploader_id != request.user.id:
             raise Http404("No clip matches the given query.")

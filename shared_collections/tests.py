@@ -419,6 +419,16 @@ class CoreLoopViewTests(TestCase):
         self.assertEqual(resp.status_code, 404)
         self.assertFalse(CollectionClip.objects.filter(clip=others_clip).exists())
 
+    def test_add_clip_with_malformed_id_returns_404(self):
+        # A non-numeric / missing clip id must 404, not 500: it can't reach the
+        # integer-pk lookup unparsed.
+        self.client.force_login(self.member)
+        for data in ({"clip": "abc"}, {"clip": ""}, {}):
+            resp = self.client.post(
+                reverse("collection-add-clip", args=[self.col.pk]), data
+            )
+            self.assertEqual(resp.status_code, 404)
+
     # --- unlink --------------------------------------------------------------
     def test_remove_clip_unlinks_but_keeps_row(self):
         clip = make_clip(self.member, Clip.Visibility.UNLISTED)
