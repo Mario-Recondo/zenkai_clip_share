@@ -1,5 +1,5 @@
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -122,7 +122,7 @@ class ClipCreateView(LoginRequiredMixin, CreateView):
         return super().form_invalid(form)
 
 
-class ClipDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class ClipDeleteView(LoginRequiredMixin, DeleteView):
     """Collection-aware My-clips delete.
 
     When the clip lives in 1+ collections the confirm page offers two choices:
@@ -142,9 +142,11 @@ class ClipDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     template_name = "clips/clip_confirm_delete.html"
     success_url = reverse_lazy("clip-list")
 
-    def test_func(self):
-        # Only the uploader may delete their clip (403 otherwise).
-        return self.get_object().uploader == self.request.user
+    def get_queryset(self):
+        # Owner-scoped so a non-uploader gets 404, not 403 — otherwise this URL is
+        # an existence oracle that leaks UNLISTED clip ids that clip_detail /
+        # clip_status deliberately conceal (see can_view).
+        return Clip.objects.filter(uploader=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
