@@ -16,7 +16,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -167,15 +167,18 @@ def collection_detail(request, pk):
     )
 
 
-class CollectionDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class CollectionDeleteView(LoginRequiredMixin, DeleteView):
     model = Collection
     template_name = "shared_collections/collection_confirm_delete.html"
     success_url = reverse_lazy("collection-list")
     context_object_name = "collection"
 
-    def test_func(self):
-        # Only the owner may delete the collection.
-        return self.get_object().owner_id == self.request.user.id
+    def get_queryset(self):
+        # Owner-scoped so non-owners (incl. non-members) get 404, not 403 —
+        # matching the 404-concealment in _get_owned_collection /
+        # _get_active_member_collection so a private workspace's existence
+        # isn't revealed via the delete URL.
+        return Collection.objects.filter(owner=self.request.user)
 
     # Deleting the Collection cascades its CollectionClip rows (unlink-all); the
     # Clip rows are never touched. No safe-delete needed — this only removes links.
@@ -261,7 +264,14 @@ def collection_add_clip(request, pk):
     )
 
     if request.method == "POST":
-        clip = get_object_or_404(Clip, pk=request.POST.get("clip"))
+        # Parse the posted id first: feeding a non-numeric value straight into an
+        # integer-pk lookup raises ValueError (a 500), not the concealed 404 we
+        # want for a bad/forged clip id.
+        try:
+            clip_pk = int(request.POST.get("clip"))
+        except (TypeError, ValueError):
+            raise Http404("No clip matches the given query.") from None
+        clip = get_object_or_404(Clip, pk=clip_pk)
         # Members may add only their own clips — keeps added_by == uploader.
         if clip.uploader_id != request.user.id:
             raise Http404("No clip matches the given query.")
@@ -317,9 +327,16 @@ def collection_delete_clip(request, pk, clip_pk):
     collection = _get_active_member_collection(request, pk)
     link = _link_or_404(collection, clip_pk)
     clip = link.clip
-    if not can_delete(collection, request.user, clip):
-        raise Http404("No clip matches the given query.")
-    delete_clip_in_collection(collection, clip)
+    # Authorize and delete inside ONE transaction so a stale can_delete read can't
+    # beat a concurrent allow_owner_delete revocation on this irreversible action
+    # (TOCTOU). Lock the uploader's membership row first: a racing
+    # membership_settings UPDATE then blocks until we commit, so the consent value
+    # we check is the one that wins — not a torn read.
+    with transaction.atomic():
+        list(collection.memberships.select_for_update().filter(user=clip.uploader))
+        if not can_delete(collection, request.user, clip):
+            raise Http404("No clip matches the given query.")
+        delete_clip_in_collection(collection, clip)
     return redirect("collection-detail", pk=collection.pk)
 
 
