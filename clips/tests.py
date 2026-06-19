@@ -197,10 +197,22 @@ class ClipDeleteTests(TestCase):
         # File cleanup runs on commit (destroy_clip queues it via on_commit), so
         # capture and execute the callbacks to observe the storage delete.
         with self.captureOnCommitCallbacks(execute=True):
-            resp = self.client.post(reverse("clip-delete", args=[self.clip.pk]))
+            resp = self.client.post(
+                reverse("clip-delete", args=[self.clip.pk]),
+                {"action": "delete_everywhere"},
+            )
         self.assertRedirects(resp, reverse("clip-list"))
         self.assertFalse(Clip.objects.filter(pk=self.clip.pk).exists())
         self.assertFalse(os.path.exists(raw_path))
+
+    def test_missing_or_invalid_action_does_not_destroy(self):
+        # Destruction requires an explicit action="delete_everywhere"; a missing
+        # or unknown action must fail safe (400) rather than silently delete.
+        self.client.force_login(self.owner)
+        for data in ({}, {"action": "bogus"}, {"action": ""}):
+            resp = self.client.post(reverse("clip-delete", args=[self.clip.pk]), data)
+            self.assertEqual(resp.status_code, 400)
+            self.assertTrue(Clip.objects.filter(pk=self.clip.pk).exists())
 
     def test_non_owner_gets_404_not_403(self):
         # Owner-scoped queryset returns 404 (not 403) so the delete URL can't be
