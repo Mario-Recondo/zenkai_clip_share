@@ -33,6 +33,7 @@
             </a>
             <a href="{% url 'clip-list' %}" class="btn btn-ghost max-sm:hidden">Home</a>
             {% if user.is_authenticated %}
+                <a href="{% url 'collection-list' %}" class="btn btn-ghost max-sm:hidden">Collections</a>
                 <form method="get" action="{% url 'clip-list' %}" role="search" class="mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xs">
                     <input type="search" name="q" value="{{ request.GET.q|default:'' }}"
                            placeholder="Search clips" aria-label="Search clips"
