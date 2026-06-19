@@ -202,11 +202,43 @@ class ClipDeleteTests(TestCase):
         self.assertFalse(Clip.objects.filter(pk=self.clip.pk).exists())
         self.assertFalse(os.path.exists(raw_path))
 
-    def test_non_owner_gets_403(self):
+    def test_non_owner_gets_404_not_403(self):
+        # Owner-scoped queryset returns 404 (not 403) so the delete URL can't be
+        # used as an existence oracle for clips the requester doesn't own — same
+        # 404-concealment as clip_detail / clip_status. A real-but-not-yours clip
+        # must be indistinguishable from a nonexistent one on BOTH the GET confirm
+        # page and the destructive POST.
         self.client.force_login(self.intruder)
-        resp = self.client.post(reverse("clip-delete", args=[self.clip.pk]))
-        self.assertEqual(resp.status_code, 403)
+        # GET confirm page: existing-but-not-yours == nonexistent (both 404).
+        get_real = self.client.get(reverse("clip-delete", args=[self.clip.pk]))
+        get_missing = self.client.get(reverse("clip-delete", args=[99999]))
+        self.assertEqual(get_real.status_code, 404)
+        self.assertEqual(get_missing.status_code, 404)
+        # The confirm template must never render for a non-owner.
+        self.assertNotIn(
+            "clips/clip_confirm_delete.html", [t.name for t in get_real.templates]
+        )
+        # POST destroy path: same 404, no row removed.
+        post_real = self.client.post(reverse("clip-delete", args=[self.clip.pk]))
+        post_missing = self.client.post(reverse("clip-delete", args=[99999]))
+        self.assertEqual(post_real.status_code, 404)
+        self.assertEqual(post_missing.status_code, 404)
         self.assertTrue(Clip.objects.filter(pk=self.clip.pk).exists())
+
+    def test_non_owner_cannot_unpublish_via_form_valid(self):
+        # form_valid() has a non-destructive action="unpublish" branch. Prove a
+        # non-owner can never reach it: visibility stays unchanged and the
+        # destructive destroy_clip helper is never invoked.
+        before = Clip.objects.get(pk=self.clip.pk).visibility
+        self.client.force_login(self.intruder)
+        with mock.patch("clips.views.destroy_clip") as destroy:
+            resp = self.client.post(
+                reverse("clip-delete", args=[self.clip.pk]),
+                {"action": "unpublish"},
+            )
+        self.assertEqual(resp.status_code, 404)
+        destroy.assert_not_called()
+        self.assertEqual(Clip.objects.get(pk=self.clip.pk).visibility, before)
 
     def test_anonymous_redirected_to_login(self):
         resp = self.client.post(reverse("clip-delete", args=[self.clip.pk]))

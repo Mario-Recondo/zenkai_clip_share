@@ -483,11 +483,32 @@ class CoreLoopViewTests(TestCase):
         self.assertTrue(Clip.objects.filter(pk=clip.pk).exists())
         self.assertEqual(CollectionClip.objects.filter(clip=clip).count(), 0)
 
-    def test_only_owner_can_delete_collection(self):
-        self.client.force_login(self.member)
-        resp = self.client.post(reverse("collection-delete", args=[self.col.pk]))
-        self.assertEqual(resp.status_code, 403)
+    def _assert_delete_concealed(self, user):
+        # DeleteView exposes both a GET confirm page and a destructive POST. For an
+        # unauthorized user, BOTH must treat a real-but-not-yours collection
+        # exactly like a nonexistent one (404), and the confirm template must never
+        # render — otherwise the URL is an ownership/existence oracle.
+        self.client.force_login(user)
+        for method in (self.client.get, self.client.post):
+            real = method(reverse("collection-delete", args=[self.col.pk]))
+            missing = method(reverse("collection-delete", args=[99999]))
+            self.assertEqual(real.status_code, 404)
+            self.assertEqual(missing.status_code, 404)
+            self.assertNotIn(
+                "shared_collections/collection_confirm_delete.html",
+                [t.name for t in real.templates],
+            )
         self.assertTrue(Collection.objects.filter(pk=self.col.pk).exists())
+
+    def test_non_owner_member_cannot_delete_or_enumerate_collection(self):
+        # An active member already knows the collection exists, but must still be
+        # denied delete uniformly (404, not 403) with no confirm page.
+        self._assert_delete_concealed(self.member)
+
+    def test_non_member_cannot_delete_or_enumerate_collection(self):
+        # A non-member must not be able to tell a real private collection from a
+        # nonexistent one on either the GET confirm page or the destructive POST.
+        self._assert_delete_concealed(self.outsider)
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
