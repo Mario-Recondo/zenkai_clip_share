@@ -17,6 +17,16 @@
     {% if user.is_authenticated %}
         <link rel="stylesheet" href="{% static 'css/idle-timeout.css' %}">
         <link rel="stylesheet" href="{% static 'css/account-menu.css' %}">
+        <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
+        <script>
+            // Restore the persisted sidebar collapsed state before first paint
+            // (avoids a flash of the expanded rail on every navigation).
+            try {
+                if (localStorage.getItem('zenkai:sidebar-collapsed') === '1') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        </script>
     {% endif %}
     <script src="{% static 'js/clip-status.js' %}" defer></script>
     {% block extra_head %}{% endblock %}
@@ -24,24 +34,36 @@
 <body class="flex min-h-full flex-col bg-ink-950 font-sans text-ink-100 antialiased">
     {% block header %}
     <header class="sticky top-0 z-40 border-b border-ink-800 bg-ink-950/80 backdrop-blur">
-        <nav class="mx-auto flex h-14 max-w-6xl items-center gap-1 px-4">
-            <a href="{% url 'clip-list' %}" class="mr-3 flex items-center gap-2">
-                <img src="{% static 'img/logo.svg' %}" alt="" aria-hidden="true" class="size-8 shrink-0">
-                <span class="font-display text-xl font-bold tracking-tight">
-                    Zenkai<span class="text-flame-500">Clips</span>
-                </span>
-            </a>
-            <a href="{% url 'clip-list' %}" class="btn btn-ghost max-sm:hidden">Home</a>
+        <div class="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2 lg:flex-nowrap">
             {% if user.is_authenticated %}
-                <a href="{% url 'collection-list' %}" class="btn btn-ghost max-sm:hidden">Collections</a>
-                <form method="get" action="{% url 'clip-list' %}" role="search" class="mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xs">
+                {# Left group: equal-flex side so the search lands centered in the viewport (YouTube-style). #}
+                <div class="flex items-center gap-2 lg:flex-1 lg:basis-0">
+                    {# Drawer toggle: mobile only (sidebar is off-canvas there); on desktop the toggle lives in the sidebar. #}
+                    <button type="button" class="sidebar-burger lg:hidden" data-sidebar-open
+                            aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                            <path d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+                    <a href="{% url 'clip-list' %}" class="flex items-center gap-2">
+                        <img src="{% static 'img/logo.svg' %}" alt="" aria-hidden="true" class="size-8 shrink-0">
+                        <span class="font-display text-xl font-bold tracking-tight">
+                            Zenkai<span class="text-flame-500">Clips</span>
+                        </span>
+                    </a>
+                </div>
+                {# Centered search: fixed-ish width on desktop, wraps to its own full-width second row on mobile. #}
+                <form method="get" action="{% url 'clip-list' %}" role="search"
+                      class="order-last w-full min-w-0 basis-full lg:order-none lg:w-[36rem] lg:max-w-full lg:basis-auto">
                     <input type="search" name="q" value="{{ request.GET.q|default:'' }}"
                            placeholder="Search clips" aria-label="Search clips"
                            class="w-full rounded-lg border border-ink-700 bg-ink-900 px-3.5 py-1.5 text-sm text-ink-100 transition-colors placeholder:text-ink-400 focus:border-flame-500 focus:ring-1 focus:ring-flame-500 focus:outline-none">
                 </form>
-                <div class="ml-auto flex items-center gap-1">
+                {# Right group: equal-flex side, actions pinned to the right. #}
+                <div class="ml-auto flex items-center gap-1 lg:flex-1 lg:basis-0 lg:justify-end">
                     <a href="{% url 'clip-create' %}" class="btn btn-primary">Upload</a>
-                    {# Account menu: avatar trigger opens a dropdown of "me" actions. #}
+                    {# Account menu: avatar trigger opens a dropdown of account-only actions. #}
                     <div class="account-menu" data-account-menu>
                         <button type="button" class="account-menu__trigger" data-account-trigger
                                 aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
@@ -54,9 +76,6 @@
                         </button>
                         <div class="account-menu__panel" data-account-panel role="menu" hidden>
                             <button type="button" class="account-menu__item" role="menuitem" data-avatar-open>Change avatar</button>
-                            <a href="{% url 'user-clips' user.username %}" class="account-menu__item" role="menuitem">My clips</a>
-                            <a href="{% url 'collection-list' %}" class="account-menu__item" role="menuitem">Collections</a>
-                            <a href="{% url 'my-invites' %}" class="account-menu__item" role="menuitem">My invites</a>
                             <div class="account-menu__divider" role="separator"></div>
                             <form method="post" action="{% url 'logout' %}">
                                 {% csrf_token %}
@@ -66,26 +85,39 @@
                     </div>
                 </div>
             {% else %}
+                <a href="{% url 'clip-list' %}" class="flex items-center gap-2">
+                    <img src="{% static 'img/logo.svg' %}" alt="" aria-hidden="true" class="size-8 shrink-0">
+                    <span class="font-display text-xl font-bold tracking-tight">
+                        Zenkai<span class="text-flame-500">Clips</span>
+                    </span>
+                </a>
                 <div class="ml-auto flex items-center gap-1">
                     <a href="{% url 'login' %}" class="btn btn-ghost">Login</a>
                     <a href="{% url 'register' %}" class="btn btn-primary">Register</a>
                 </div>
             {% endif %}
-        </nav>
+        </div>
     </header>
     {% endblock %}
 
-    <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10">
-        {% if messages %}
-            <ul class="mb-6 space-y-2">
-                {% for message in messages %}
-                    <li class="rounded-lg border px-4 py-2.5 text-sm {% if message.tags == 'error' %}border-red-900 bg-red-950/40 text-red-200{% else %}border-ink-700 bg-ink-850 text-ink-200{% endif %}">{{ message }}</li>
-                {% endfor %}
-            </ul>
+    <div class="flex flex-1">
+        {% if user.is_authenticated %}
+            {% include "includes/sidebar.html" %}
         {% endif %}
-        {% block content %}
-        {% endblock %}
-    </main>
+        <main class="min-w-0 flex-1 px-4 py-10">
+            <div class="mx-auto w-full max-w-6xl">
+                {% if messages %}
+                    <ul class="mb-6 space-y-2">
+                        {% for message in messages %}
+                            <li class="rounded-lg border px-4 py-2.5 text-sm {% if message.tags == 'error' %}border-red-900 bg-red-950/40 text-red-200{% else %}border-ink-700 bg-ink-850 text-ink-200{% endif %}">{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% block content %}
+                {% endblock %}
+            </div>
+        </main>
+    </div>
 
     <footer class="border-t border-ink-800 py-6">
         <p class="text-center text-xs text-ink-400">Zenkai Clips — share your best plays.</p>
@@ -148,6 +180,7 @@
         </div>
 
         <script src="{% static 'js/account-menu.js' %}" defer></script>
+        <script src="{% static 'js/sidebar.js' %}" defer></script>
     {% endif %}
 
     <script>

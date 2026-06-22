@@ -1,0 +1,220 @@
+/* Collapsible primary side-navbar. Plain CSS over the theme variables so it
+ * needs no Tailwind rebuild. State classes live on <html>:
+ *   .sidebar-collapsed  desktop icon rail (persisted in localStorage)
+ *   .sidebar-open       mobile off-canvas drawer is showing (ephemeral)
+ * Desktop: a sticky left rail below the header that collapses to icons.
+ * Mobile (< 1024px): an off-canvas overlay drawer with a backdrop. */
+
+:root {
+    --sidebar-w: 15rem;     /* 240px expanded */
+    --sidebar-rail: 4rem;   /* 64px icon rail */
+    --header-h: 3.5rem;     /* matches header h-14 */
+}
+
+.sidebar {
+    flex: 0 0 var(--sidebar-w);
+    width: var(--sidebar-w);
+    align-self: flex-start;
+    position: sticky;
+    top: var(--header-h);
+    height: calc(100vh - var(--header-h));
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0.625rem 0.5rem;
+    border-right: 1px solid var(--color-ink-800);
+    background-color: var(--color-ink-950);
+    transition: width 0.2s ease, flex-basis 0.2s ease;
+}
+
+.sidebar__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-bottom: 0.375rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--color-ink-300);
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.sidebar__toggle:hover {
+    background-color: var(--color-ink-800);
+    color: var(--color-ink-100);
+}
+
+.sidebar__toggle:focus-visible {
+    outline: 2px solid var(--color-flame-500);
+    outline-offset: 2px;
+}
+
+.sidebar__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.sidebar__item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.5rem;
+    border-left: 2px solid transparent;
+    color: var(--color-ink-300);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.12s, color 0.12s;
+}
+
+.sidebar__item:hover {
+    background-color: var(--color-ink-800);
+    color: var(--color-ink-100);
+}
+
+.sidebar__item:focus-visible {
+    outline: 2px solid var(--color-flame-500);
+    outline-offset: 2px;
+}
+
+.sidebar__icon {
+    flex: 0 0 auto;
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.sidebar__item.is-active {
+    border-left-color: var(--color-flame-500);
+    background-color: var(--color-ink-850);
+    color: var(--color-ink-100);
+}
+
+.sidebar__item.is-active .sidebar__icon {
+    color: var(--color-flame-500);
+}
+
+/* Backdrop is desktop-hidden by default; only used by the mobile drawer. */
+.sidebar-backdrop {
+    display: none;
+}
+
+/* Header drawer-toggle button. Hidden by default (and via the template's
+ * `lg:hidden` on desktop); the mobile media query below enables it. Defined
+ * before the media queries so that rule wins the cascade on small screens. */
+.sidebar-burger {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-right: 0.25rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--color-ink-300);
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.sidebar-burger:hover {
+    background-color: var(--color-ink-800);
+    color: var(--color-ink-100);
+}
+
+.sidebar-burger:focus-visible {
+    outline: 2px solid var(--color-flame-500);
+    outline-offset: 2px;
+}
+
+/* ---- Desktop icon rail ---- */
+@media (min-width: 1024px) {
+    html.sidebar-collapsed .sidebar {
+        flex-basis: var(--sidebar-rail);
+        width: var(--sidebar-rail);
+    }
+
+    html.sidebar-collapsed .sidebar__label {
+        display: none;
+    }
+
+    html.sidebar-collapsed .sidebar__item {
+        justify-content: center;
+        gap: 0;
+        padding-left: 0;
+        padding-right: 0;
+        border-left-width: 0;
+    }
+
+    /* Keep the active accent readable in the rail (no left border, so tint the icon). */
+    html.sidebar-collapsed .sidebar__item.is-active {
+        background-color: var(--color-ink-850);
+    }
+}
+
+/* ---- Mobile overlay drawer ---- */
+@media (max-width: 1023px) {
+    .sidebar {
+        position: fixed;
+        top: var(--header-h);
+        left: 0;
+        bottom: 0;
+        height: auto;
+        width: min(15rem, 80vw);
+        flex-basis: auto;
+        z-index: 45;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+    }
+
+    html.sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+
+    /* In the drawer, labels always show regardless of the persisted rail state. */
+    html.sidebar-collapsed .sidebar__label {
+        display: inline;
+    }
+
+    html.sidebar-collapsed .sidebar__item {
+        justify-content: flex-start;
+        gap: 0.75rem;
+        padding-left: 0.625rem;
+        padding-right: 0.625rem;
+        border-left-width: 2px;
+    }
+
+    /* The in-rail collapse toggle is irrelevant on mobile (header burger is used). */
+    .sidebar__toggle {
+        display: none;
+    }
+
+    .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        top: var(--header-h);
+        z-index: 44;
+        background-color: color-mix(in srgb, var(--color-ink-950) 65%, transparent);
+    }
+
+    html.sidebar-open .sidebar-backdrop {
+        display: block;
+    }
+
+    .sidebar-burger {
+        display: inline-flex;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar {
+        transition: none;
+    }
+}

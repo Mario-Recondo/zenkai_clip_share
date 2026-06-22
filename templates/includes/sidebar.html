@@ -1,0 +1,56 @@
+{% comment %}
+Collapsible primary side-navbar (authenticated users only). Rendered inside the
+app shell below the header. Styling/behaviour: static/css/sidebar.css +
+static/js/sidebar.js. Active item matched on the resolved URL name.
+{% endcomment %}
+{% with current=request.resolver_match.url_name %}
+<div class="sidebar-backdrop" data-sidebar-close aria-hidden="true"></div>
+<aside id="app-sidebar" class="sidebar" aria-label="Primary">
+    {# Desktop collapse toggle at the top of the rail; hidden on mobile (header burger opens the drawer). #}
+    <button type="button" class="sidebar__toggle" data-sidebar-toggle
+            aria-label="Collapse navigation" aria-expanded="true" aria-controls="app-sidebar">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </button>
+    <nav class="sidebar__nav">
+        <a href="{% url 'clip-list' %}" title="Home"
+           class="sidebar__item{% if current == 'clip-list' %} is-active{% endif %}"
+           {% if current == 'clip-list' %}aria-current="page"{% endif %}>
+            <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>
+            </svg>
+            <span class="sidebar__label">Home</span>
+        </a>
+        <a href="{% url 'collection-list' %}" title="Collections"
+           class="sidebar__item{% if current == 'collection-list' %} is-active{% endif %}"
+           {% if current == 'collection-list' %}aria-current="page"{% endif %}>
+            <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/>
+            </svg>
+            <span class="sidebar__label">Collections</span>
+        </a>
+        <a href="{% url 'user-clips' user.username %}" title="My clips"
+           class="sidebar__item{% if current == 'user-clips' %} is-active{% endif %}"
+           {% if current == 'user-clips' %}aria-current="page"{% endif %}>
+            <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3V9Z"/>
+            </svg>
+            <span class="sidebar__label">My clips</span>
+        </a>
+        <a href="{% url 'my-invites' %}" title="My invites"
+           class="sidebar__item{% if current == 'my-invites' %} is-active{% endif %}"
+           {% if current == 'my-invites' %}aria-current="page"{% endif %}>
+            <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
+            </svg>
+            <span class="sidebar__label">My invites</span>
+        </a>
+    </nav>
+</aside>
+{% endwith %}
