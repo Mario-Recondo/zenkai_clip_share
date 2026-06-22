@@ -1,4 +1,10 @@
 {% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/collection-detail.css' %}">
+    <script src="{% static 'js/collection-detail.js' %}" defer></script>
+{% endblock %}
 
 {% block content %}
     <div class="flex flex-wrap items-start justify-between gap-4">
@@ -11,11 +17,66 @@
         <div class="flex shrink-0 items-center gap-2">
             <a href="{% url 'collection-add-clip' collection.pk %}" class="btn btn-secondary">Add a clip</a>
             <a href="{% url 'collection-upload' collection.pk %}" class="btn btn-primary">Upload</a>
+
+            {# Gear: management actions only (Invite/Delete for owners; the owner-delete toggle + Leave for members). #}
+            <div class="collection-menu" data-collection-menu>
+                <button type="button" class="collection-iconbtn" data-collection-trigger
+                        aria-haspopup="true" aria-expanded="false" aria-label="Manage collection">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                        <path d="M10.3 3.3a1.5 1.5 0 0 1 3.4 0l.2.9a1.5 1.5 0 0 0 2.1 1l.8-.4a1.5 1.5 0 0 1 1.9 2.3l-.5.7a1.5 1.5 0 0 0 .4 2.3l.8.5a1.5 1.5 0 0 1-.6 2.8l-.9.1a1.5 1.5 0 0 0-1.3 1.9l.3.9a1.5 1.5 0 0 1-2.5 1.5l-.7-.6a1.5 1.5 0 0 0-2.3 0l-.7.6a1.5 1.5 0 0 1-2.5-1.5l.3-.9a1.5 1.5 0 0 0-1.3-1.9l-.9-.1a1.5 1.5 0 0 1-.6-2.8l.8-.5a1.5 1.5 0 0 0 .4-2.3l-.5-.7a1.5 1.5 0 0 1 1.9-2.3l.8.4a1.5 1.5 0 0 0 2.1-1z"/>
+                        <circle cx="12" cy="12" r="2.6"/>
+                    </svg>
+                </button>
+                <div class="collection-menu__panel" data-collection-panel hidden>
+                    {% if is_owner %}
+                        <button type="button" class="collection-menu__item" data-invite-open>Invite a member</button>
+                        <div class="collection-menu__divider"></div>
+                        <a href="{% url 'collection-delete' collection.pk %}" class="collection-menu__item collection-menu__item--danger">Delete collection</a>
+                    {% else %}
+                        {% if my_membership %}
+                            <div class="collection-menu__toggle">
+                                <form method="post" action="{% url 'membership-settings' collection.pk %}">
+                                    {% csrf_token %}
+                                    <label class="collection-toggle">
+                                        <input type="checkbox" name="allow_owner_delete"
+                                               onchange="this.form.submit()"
+                                               {% if my_membership.allow_owner_delete %}checked{% endif %}>
+                                        <span>owner-delete</span>
+                                    </label>
+                                </form>
+                                <button type="button" class="collection-info" aria-label="What is owner-delete?">i</button>
+                                <p class="collection-info__pop">
+                                    By default the owner can only remove your clips from the collection, not
+                                    delete them. Enable this to let the owner permanently delete your clips.
+                                </p>
+                            </div>
+                            <div class="collection-menu__divider"></div>
+                        {% endif %}
+                        <form method="post" action="{% url 'collection-leave' collection.pk %}"
+                              onsubmit="return confirm('Leave this collection? Your clips stay in it.');">
+                            {% csrf_token %}
+                            <button type="submit" class="collection-menu__item collection-menu__item--danger">Leave collection</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Member-list toggle (rightmost so the panel opens to its right). #}
+            <button type="button" class="collection-iconbtn" data-members-toggle
+                    aria-controls="member-panel" aria-expanded="true" aria-label="Toggle member list">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <circle cx="9" cy="8" r="3"/>
+                    <path d="M3.5 19a5.5 5.5 0 0 1 11 0"/>
+                    <path d="M16 5.2a3 3 0 0 1 0 5.6"/>
+                    <path d="M17 13.5a5.5 5.5 0 0 1 3.5 5.5"/>
+                </svg>
+            </button>
         </div>
     </div>
 
-    <div class="mt-8 grid gap-8 lg:grid-cols-[1fr_16rem]">
-        <div>
+    <div class="collection-layout" data-collection-layout
+         data-members-collapsed="false" data-drawer-open="false">
+        <div class="collection-content">
             {% if clips %}
                 <div class="grid gap-x-5 gap-y-8 sm:grid-cols-2">
                     {% for clip in clips %}
@@ -51,9 +112,20 @@
             {% include "clips/includes/pagination.html" %}
         </div>
 
-        <aside class="lg:order-last">
-            <h2 class="text-sm font-semibold tracking-tight text-ink-300">Members</h2>
-            <ul class="mt-3 space-y-2">
+        {# Backdrop is only visible behind the mobile drawer (hidden on desktop). #}
+        <div class="member-backdrop" data-members-backdrop aria-hidden="true"></div>
+
+        <aside id="member-panel" class="member-panel" aria-label="Members">
+            <div class="member-panel__header">
+                <h2 class="member-panel__title">Members</h2>
+                <button type="button" class="member-panel__close" data-members-close aria-label="Close member list">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6 6 18"/>
+                    </svg>
+                </button>
+            </div>
+
+            <ul class="space-y-2">
                 <li class="flex items-center gap-2.5">
                     {% include "includes/avatar.html" with profile_user=collection.owner size="size-8" %}
                     <span class="min-w-0">
@@ -76,61 +148,44 @@
                 {% endfor %}
             </ul>
 
-            {% if is_owner %}
-                {% if pending %}
-                    <h3 class="mt-6 text-xs font-semibold uppercase tracking-wide text-ink-500">Pending invites</h3>
-                    <ul class="mt-2 space-y-2">
-                        {% for membership in pending %}
-                            <li class="flex items-center gap-2.5">
-                                {% include "includes/avatar.html" with profile_user=membership.user size="size-8" extra="opacity-60" %}
-                                <span class="block min-w-0 flex-1 truncate text-sm text-ink-400">{{ membership.user.username }}</span>
-                                <form method="post" action="{% url 'collection-remove-member' collection.pk membership.user.pk %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-ghost shrink-0 px-2 py-1 text-xs" aria-label="Cancel invite for {{ membership.user.username }}">Cancel</button>
-                                </form>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-
-                <form method="post" action="{% url 'collection-invite' collection.pk %}" class="mt-6 border-t border-ink-800 pt-4">
-                    {% csrf_token %}
-                    <label for="invite-username" class="block text-sm font-medium">Invite a member</label>
-                    <div class="mt-2 flex gap-2">
-                        <input id="invite-username" name="username" type="text" placeholder="username" required
-                               class="min-w-0 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 text-sm text-ink-100 transition-colors placeholder:text-ink-400 focus:border-flame-500 focus:ring-1 focus:ring-flame-500 focus:outline-none">
-                        <button type="submit" class="btn btn-secondary shrink-0">Invite</button>
-                    </div>
-                </form>
-
-                <div class="mt-6 border-t border-ink-800 pt-4">
-                    <a href="{% url 'collection-delete' collection.pk %}" class="btn btn-ghost w-full text-red-400 hover:text-red-300">Delete collection</a>
-                </div>
-            {% else %}
-                {% if my_membership %}
-                    <form method="post" action="{% url 'membership-settings' collection.pk %}" class="mt-6 border-t border-ink-800 pt-4">
-                        {% csrf_token %}
-                        <label class="flex cursor-pointer items-start gap-2.5 text-sm">
-                            <input type="checkbox" name="allow_owner_delete"
-                                   onchange="this.form.submit()"
-                                   {% if my_membership.allow_owner_delete %}checked{% endif %}
-                                   class="mt-0.5">
-                            <span>
-                                <span class="block font-medium">Let the owner delete my clips</span>
-                                <span class="block text-ink-400">By default the owner can only remove your clips from the collection, not delete them.</span>
-                            </span>
-                        </label>
-                    </form>
-                {% endif %}
-
-                <div class="mt-6 border-t border-ink-800 pt-4">
-                    <form method="post" action="{% url 'collection-leave' collection.pk %}"
-                          onsubmit="return confirm('Leave this collection? Your clips stay in it.');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-ghost w-full text-red-400 hover:text-red-300">Leave collection</button>
-                    </form>
-                </div>
+            {% if is_owner and pending %}
+                <h3 class="mt-6 text-xs font-semibold uppercase tracking-wide text-ink-500">Pending</h3>
+                <ul class="mt-2 space-y-2">
+                    {% for membership in pending %}
+                        <li class="flex items-center gap-2.5">
+                            {% include "includes/avatar.html" with profile_user=membership.user size="size-8" extra="opacity-60" %}
+                            <span class="block min-w-0 flex-1 truncate text-sm text-ink-400">{{ membership.user.username }}</span>
+                            <form method="post" action="{% url 'collection-remove-member' collection.pk membership.user.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-ghost shrink-0 px-2 py-1 text-xs" aria-label="Cancel invite for {{ membership.user.username }}">Cancel</button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
             {% endif %}
         </aside>
     </div>
+
+    {% if is_owner %}
+        {% comment %}
+            Invite popup (Google-Docs style): type a username, send or cancel.
+            POSTs normally; success/error surfaces as a message on the reload.
+        {% endcomment %}
+        <div id="invite-modal" class="avatar-modal-overlay" role="dialog" aria-modal="true"
+             aria-labelledby="invite-modal-title" hidden>
+            <div class="card avatar-modal-card">
+                <h2 id="invite-modal-title" class="avatar-modal-title">Invite a member</h2>
+                <form method="post" action="{% url 'collection-invite' collection.pk %}" class="mt-5 text-left">
+                    {% csrf_token %}
+                    <label for="invite-username" class="block text-sm font-medium">Username</label>
+                    <input id="invite-username" name="username" type="text" placeholder="username" required
+                           class="mt-2 w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 text-sm text-ink-100 transition-colors placeholder:text-ink-400 focus:border-flame-500 focus:ring-1 focus:ring-flame-500 focus:outline-none">
+                    <div class="avatar-modal-actions">
+                        <button type="button" class="btn btn-ghost" data-invite-cancel>Cancel</button>
+                        <button type="submit" class="btn btn-primary">Send invite</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}

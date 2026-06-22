@@ -1,0 +1,303 @@
+/* Collection detail page: gear (management) menu, invite modal, and the
+ * Discord-style collapsible member list. Plain CSS over the theme variables so
+ * it needs no Tailwind rebuild (same approach as account-menu.css); inner
+ * card/buttons reuse the .card/.btn classes.
+ *
+ * The member list is a static right-hand column on desktop (collapse persisted
+ * in localStorage) and an off-canvas drawer on mobile (closed by default). The
+ * two behaviors are driven by separate attributes on .collection-layout so a
+ * single value can't mean "open" on one breakpoint and "closed" on the other:
+ *   - data-members-collapsed  -> desktop column hidden (ignored on mobile)
+ *   - data-drawer-open        -> mobile drawer slid in (ignored on desktop)
+ */
+
+/* ---- Round icon trigger buttons (gear + members toggle) ---- */
+.collection-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--color-ink-700);
+    border-radius: 0.5rem;
+    background: var(--color-ink-800);
+    color: var(--color-ink-300);
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.collection-iconbtn:hover {
+    background-color: var(--color-ink-700);
+    border-color: var(--color-ink-600);
+    color: var(--color-ink-100);
+}
+
+.collection-iconbtn:focus-visible {
+    outline: 2px solid var(--color-flame-500);
+    outline-offset: 2px;
+}
+
+.collection-iconbtn[aria-expanded="true"] {
+    color: var(--color-flame-400);
+    border-color: color-mix(in oklab, var(--color-flame-400) 40%, transparent);
+}
+
+.collection-iconbtn svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* ---- Gear dropdown ---- */
+.collection-menu {
+    position: relative;
+}
+
+.collection-menu__panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 50;
+    min-width: 14rem;
+    padding: 0.375rem;
+    border: 1px solid var(--color-ink-700);
+    border-radius: 0.75rem;
+    background-color: var(--color-ink-850);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.collection-menu__panel[hidden] {
+    display: none;
+}
+
+.collection-menu__item {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 0.625rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--color-ink-100);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.12s, color 0.12s;
+}
+
+.collection-menu__item:hover,
+.collection-menu__item:focus-visible {
+    background-color: var(--color-ink-800);
+    outline: none;
+}
+
+.collection-menu__item--danger {
+    color: #f87171;
+}
+
+.collection-menu__item--danger:hover,
+.collection-menu__item--danger:focus-visible {
+    background-color: color-mix(in srgb, #f87171 14%, transparent);
+}
+
+.collection-menu__divider {
+    height: 1px;
+    margin: 0.375rem 0.25rem;
+    background-color: var(--color-ink-700);
+}
+
+/* owner-delete toggle row (member, non-owner) lives inside the gear panel */
+.collection-menu__toggle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.625rem;
+}
+
+.collection-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-ink-100);
+}
+
+.collection-toggle input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--color-flame-500);
+    cursor: pointer;
+}
+
+/* "i" info affordance: reveals the explanation on hover/focus (keyboard-
+ * reachable because it's a real <button>; no JS needed). */
+.collection-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.125rem;
+    height: 1.125rem;
+    flex-shrink: 0;
+    border: 1px solid var(--color-ink-600);
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--color-ink-300);
+    font-size: 0.6875rem;
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1;
+    cursor: help;
+}
+
+.collection-info:hover,
+.collection-info:focus-visible {
+    color: var(--color-ink-100);
+    border-color: var(--color-ink-400);
+    outline: none;
+}
+
+.collection-info__pop {
+    position: absolute;
+    right: 0.5rem;
+    top: calc(100% - 0.25rem);
+    z-index: 10;
+    width: 13rem;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--color-ink-700);
+    border-radius: 0.5rem;
+    background-color: var(--color-ink-900);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    color: var(--color-ink-300);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    display: none;
+}
+
+.collection-info:hover ~ .collection-info__pop,
+.collection-info:focus-visible ~ .collection-info__pop {
+    display: block;
+}
+
+/* ---- Layout: clips + member list ---- */
+.collection-layout {
+    margin-top: 2rem;
+}
+
+.collection-content {
+    min-width: 0;
+}
+
+/* Mobile-first: the member list is an off-canvas drawer. */
+.member-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100dvh;
+    width: min(20rem, 82vw);
+    z-index: 60;
+    padding: 1.25rem;
+    overflow-y: auto;
+    border-left: 1px solid var(--color-ink-700);
+    background-color: var(--color-ink-900);
+    box-shadow: -12px 0 30px rgba(0, 0, 0, 0.5);
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+}
+
+.collection-layout[data-drawer-open="true"] .member-panel {
+    transform: translateX(0);
+}
+
+.member-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background-color: color-mix(in srgb, var(--color-ink-950) 70%, transparent);
+    display: none;
+}
+
+.collection-layout[data-drawer-open="true"] .member-backdrop {
+    display: block;
+}
+
+.member-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.member-panel__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-ink-300);
+}
+
+/* Close button only matters in the mobile drawer. */
+.member-panel__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--color-ink-400);
+    cursor: pointer;
+}
+
+.member-panel__close:hover {
+    background-color: var(--color-ink-800);
+    color: var(--color-ink-100);
+}
+
+.member-panel__close svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ---- Desktop: static right-hand column, no drawer/backdrop ---- */
+@media (min-width: 64rem) {
+    .collection-layout {
+        display: flex;
+        align-items: flex-start;
+        gap: 2rem;
+    }
+
+    .collection-content {
+        flex: 1 1 0%;
+    }
+
+    .member-panel {
+        position: static;
+        flex: 0 0 16rem;
+        width: 16rem;
+        height: auto;
+        max-height: none;
+        padding: 0;
+        z-index: auto;
+        border-left: 0;
+        background: transparent;
+        box-shadow: none;
+        transform: none;
+        overflow: visible;
+    }
+
+    .collection-layout[data-members-collapsed="true"] .member-panel {
+        display: none;
+    }
+
+    .member-panel__close {
+        display: none;
+    }
+
+    .member-backdrop {
+        display: none !important;
+    }
+}
