@@ -23,7 +23,7 @@
 
     const maxSize = parseInt(form.dataset.maxSize, 10);
     const allowedExtensions = form.dataset.extensions.split(',');
-    const DRAG_CLASSES = ['border-ember-500', 'bg-ink-800'];
+    const DRAG_CLASSES = ['border-flame-500', 'bg-ink-800'];
 
     // JS is running: swap the native input for the dropzone.
     input.hidden = true;
