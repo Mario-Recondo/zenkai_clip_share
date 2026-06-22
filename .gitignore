@@ -26,6 +26,8 @@ local_settings.py
 
 # Claude Code local config and skills
 .claude/
+# Playwright MCP browser snapshots/console logs (local test runs)
+.playwright-mcp/
 
 # Internal planning / review docs — keep local, don't publish
 architecture_flaws.md
@@ -34,3 +36,6 @@ last_session.md
 roadmap.md
 collection_plan.md
 collection_plan_findings.md
+
+# Zenkai logo images
+images/
