@@ -525,6 +525,9 @@
     --tw-border-style: dashed;
     border-style: dashed;
   }
+  .border-flame-500 {
+    border-color: var(--color-flame-500);
+  }
   .border-flame-500\/30 {
     border-color: color-mix(in srgb, #ff4a0d 30%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
