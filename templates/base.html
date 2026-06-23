@@ -27,6 +27,23 @@
                 }
             } catch (e) {}
         </script>
+        <script>
+            // The header height isn't fixed: on mobile the search form wraps
+            // to a second row, so the real header is taller than the desktop
+            // h-14. The sidebar drawer and backdrop are positioned with the
+            // --header-h CSS variable, so measure the rendered header and keep
+            // the variable in sync — otherwise the drawer overlaps the header.
+            (function () {
+                function syncHeaderHeight() {
+                    var header = document.querySelector('header');
+                    if (!header) return;
+                    document.documentElement.style.setProperty(
+                        '--header-h', header.offsetHeight + 'px');
+                }
+                window.addEventListener('DOMContentLoaded', syncHeaderHeight);
+                window.addEventListener('resize', syncHeaderHeight);
+            })();
+        </script>
     {% endif %}
     <script src="{% static 'js/clip-status.js' %}" defer></script>
     {% block extra_head %}{% endblock %}
