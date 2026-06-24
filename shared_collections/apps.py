@@ -7,5 +7,11 @@ class SharedCollectionsConfig(AppConfig):
     verbose_name = "Collections"
 
     def ready(self):
-        # Register the row-locking (Postgres) system check.
-        from . import checks  # noqa: F401
+        from clips.access import register_view_provider
+
+        from . import checks  # noqa: F401  (row-locking / Postgres system check)
+        from .permissions import grants_view_via_collection
+
+        # Plug collection-based view access into the clip's visibility rule
+        # (Clip.is_viewable_by) without clips importing this feature app.
+        register_view_provider(grants_view_via_collection)
