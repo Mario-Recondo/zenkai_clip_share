@@ -221,6 +221,14 @@ class SafeDeleteTests(TestCase):
         self.assertFalse(Clip.objects.filter(pk=clip.pk).exists())
         self.assertEqual(CollectionClip.objects.filter(clip_id=clip.pk).count(), 0)
 
+    def test_destroy_clip_is_idempotent_when_row_already_gone(self):
+        # A concurrent double-destroy (or double-submit) must no-op, not raise
+        # Clip.DoesNotExist -> 500, once the row is already gone.
+        clip = make_clip(self.owner, Clip.Visibility.PUBLIC)
+        destroy_clip(clip)
+        destroy_clip(clip)  # second call: row gone, should be a silent no-op
+        self.assertFalse(Clip.objects.filter(pk=clip.pk).exists())
+
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 @skipUnless(connection.vendor == "postgresql", "row-level locking requires PostgreSQL")

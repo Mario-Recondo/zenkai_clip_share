@@ -68,9 +68,16 @@ def destroy_clip(clip):
     silently bypassed. Locks the clip row and queues file cleanup via
     ``transaction.on_commit`` so a surrounding rollback can never leave bytes
     deleted while the row survives. Requires a row-locking backend (PostgreSQL).
+
+    Idempotent: if the row is already gone — e.g. a concurrent destroy committed
+    first while we waited on the lock — this no-ops instead of raising (mirrors
+    ``delete_clip_in_collection``), so a double-submit can't surface as a 500.
     """
     with transaction.atomic():
-        clip = Clip.objects.select_for_update().get(pk=clip.pk)
+        try:
+            clip = Clip.objects.select_for_update().get(pk=clip.pk)
+        except Clip.DoesNotExist:
+            return  # already destroyed by a concurrent caller — nothing to do
         files = [clip.video_file, clip.converted_video_file, clip.thumbnail]
         clip_id = clip.pk
         clip.delete()  # cascades CollectionClip rows
