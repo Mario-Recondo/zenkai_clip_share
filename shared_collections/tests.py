@@ -10,14 +10,13 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from clips.models import Clip
+from clips.services import destroy_clip
 
 from .models import Collection, CollectionClip, CollectionMembership
 from .permissions import (
     can_delete,
     can_unlink,
-    can_view,
     delete_clip_in_collection,
-    destroy_clip,
 )
 
 ACTIVE = CollectionMembership.Status.ACTIVE
@@ -49,17 +48,17 @@ class CanViewTests(TestCase):
 
     def test_public_clip_visible_to_anyone_including_anonymous(self):
         clip = make_clip(self.owner, Clip.Visibility.PUBLIC)
-        self.assertTrue(can_view(clip, AnonymousUser()))
-        self.assertTrue(can_view(clip, self.outsider))
+        self.assertTrue(clip.is_viewable_by(AnonymousUser()))
+        self.assertTrue(clip.is_viewable_by(self.outsider))
 
     def test_unlisted_hidden_from_anonymous_and_outsiders(self):
         clip = make_clip(self.member, Clip.Visibility.UNLISTED)
-        self.assertFalse(can_view(clip, AnonymousUser()))
-        self.assertFalse(can_view(clip, self.outsider))
+        self.assertFalse(clip.is_viewable_by(AnonymousUser()))
+        self.assertFalse(clip.is_viewable_by(self.outsider))
 
     def test_unlisted_visible_to_uploader(self):
         clip = make_clip(self.member, Clip.Visibility.UNLISTED)
-        self.assertTrue(can_view(clip, self.member))
+        self.assertTrue(clip.is_viewable_by(self.member))
 
     def test_unlisted_visible_to_active_member_and_owner(self):
         clip = make_clip(self.member, Clip.Visibility.UNLISTED)
@@ -68,9 +67,9 @@ class CanViewTests(TestCase):
             collection=col, user=self.member, status=ACTIVE
         )
         add_to(col, clip)
-        self.assertTrue(can_view(clip, self.owner))
-        self.assertTrue(can_view(clip, self.member))
-        self.assertFalse(can_view(clip, self.outsider))
+        self.assertTrue(clip.is_viewable_by(self.owner))
+        self.assertTrue(clip.is_viewable_by(self.member))
+        self.assertFalse(clip.is_viewable_by(self.outsider))
 
     def test_pending_member_cannot_view_unlisted(self):
         clip = make_clip(self.owner, Clip.Visibility.UNLISTED)
@@ -79,7 +78,7 @@ class CanViewTests(TestCase):
             collection=col, user=self.member, status=PENDING
         )
         add_to(col, clip)
-        self.assertFalse(can_view(clip, self.member))
+        self.assertFalse(clip.is_viewable_by(self.member))
 
     def test_ex_member_loses_view_after_membership_ends(self):
         clip = make_clip(self.owner, Clip.Visibility.UNLISTED)
@@ -88,9 +87,9 @@ class CanViewTests(TestCase):
             collection=col, user=self.member, status=ACTIVE
         )
         add_to(col, clip)
-        self.assertTrue(can_view(clip, self.member))
+        self.assertTrue(clip.is_viewable_by(self.member))
         m.delete()
-        self.assertFalse(can_view(clip, self.member))
+        self.assertFalse(clip.is_viewable_by(self.member))
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
@@ -221,6 +220,14 @@ class SafeDeleteTests(TestCase):
         destroy_clip(clip)
         self.assertFalse(Clip.objects.filter(pk=clip.pk).exists())
         self.assertEqual(CollectionClip.objects.filter(clip_id=clip.pk).count(), 0)
+
+    def test_destroy_clip_is_idempotent_when_row_already_gone(self):
+        # A concurrent double-destroy (or double-submit) must no-op, not raise
+        # Clip.DoesNotExist -> 500, once the row is already gone.
+        clip = make_clip(self.owner, Clip.Visibility.PUBLIC)
+        destroy_clip(clip)
+        destroy_clip(clip)  # second call: row gone, should be a silent no-op
+        self.assertFalse(Clip.objects.filter(pk=clip.pk).exists())
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())

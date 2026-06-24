@@ -14,8 +14,6 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView
 
-from shared_collections.permissions import can_view, destroy_clip
-
 from .forms import (
     ALLOWED_EXTENSIONS,
     MAX_DURATION_SECONDS,
@@ -23,7 +21,7 @@ from .forms import (
     ClipCreateForm,
 )
 from .models import Clip
-from .services import enqueue_transcode
+from .services import destroy_clip, enqueue_transcode
 
 PAGE_SIZE = 12
 
@@ -58,10 +56,10 @@ def clip_list(request):
 
 def clip_detail(request, pk):
     clip = get_object_or_404(Clip.objects.select_related("uploader"), pk=pk)
-    # Conditional gate (NOT @login_required): can_view returns True for PUBLIC
-    # clips so they stay anonymously viewable; UNLISTED clips are restricted to
-    # the uploader / active members, everyone else gets a 404.
-    if not can_view(clip, request.user):
+    # Conditional gate (NOT @login_required): is_viewable_by returns True for
+    # PUBLIC clips so they stay anonymously viewable; UNLISTED clips are
+    # restricted to the uploader / active members, everyone else gets a 404.
+    if not clip.is_viewable_by(request.user):
         raise Http404("No clip matches the given query.")
     return render(
         request, "clips/clip_detail.html", {"clip": clip, "title": clip.title}
@@ -70,14 +68,14 @@ def clip_detail(request, pk):
 
 def clip_status(request, pk):
     """Tiny JSON endpoint polled by the frontend while a clip transcodes."""
-    # Load the fields can_view needs alongside the status payload, so the gate
-    # doesn't trigger extra queries.
+    # Load the fields is_viewable_by needs alongside the status payload, so the
+    # gate doesn't trigger extra queries.
     clip = get_object_or_404(
         Clip.objects.only("status", "thumbnail", "visibility", "uploader"), pk=pk
     )
     # Same conditional gate as clip_detail: PUBLIC clips keep returning JSON to
     # anonymous pollers; UNLISTED ones 404 for non-uploaders / non-members.
-    if not can_view(clip, request.user):
+    if not clip.is_viewable_by(request.user):
         raise Http404("No clip matches the given query.")
     return JsonResponse(
         {
@@ -150,7 +148,7 @@ class ClipDeleteView(LoginRequiredMixin, DeleteView):
     def get_queryset(self):
         # Owner-scoped so a non-uploader gets 404, not 403 — otherwise this URL is
         # an existence oracle that leaks UNLISTED clip ids that clip_detail /
-        # clip_status deliberately conceal (see can_view).
+        # clip_status deliberately conceal (see is_viewable_by).
         return Clip.objects.filter(uploader=self.request.user)
 
     def get_context_data(self, **kwargs):

@@ -15,6 +15,7 @@ import ffmpeg
 from django.conf import settings
 from django.core.files import File
 from django.core.files.storage import default_storage
+from django.db import transaction
 from django.utils import timezone
 from django_q.tasks import async_task
 
@@ -29,6 +30,58 @@ CLIP_MEDIA_PREFIXES = ("clips/raw_uploads", "clips/converted", "clips/thumbnails
 def enqueue_transcode(clip):
     """Dispatch a clip for asynchronous transcoding. Returns the task id."""
     return async_task("clips.services.transcode_clip", clip.pk)
+
+
+# --- Destructive deletion -----------------------------------------------------
+#
+# These live on the clips side (the domain layer) so destroying a clip never
+# requires importing a higher-level feature. ``shared_collections`` reuses
+# ``cleanup_clip_files_on_commit`` for its safe in-collection delete.
+
+
+def cleanup_clip_files_on_commit(clip_id, files):
+    """Queue best-effort storage cleanup to run AFTER the outermost commit.
+
+    Never raises: the DB row is already gone, so a storage hiccup may orphan
+    files (the reaper job reclaims them) but must not resurrect the clip or mask
+    the caller's flow.
+    """
+
+    def cleanup():
+        for f in files:
+            if not f:
+                continue
+            try:
+                f.delete(save=False)
+            except Exception:
+                logger.exception(
+                    "orphaned media after clip delete (clip_id=%s)", clip_id
+                )
+
+    transaction.on_commit(cleanup)
+
+
+def destroy_clip(clip):
+    """Fully destroy a clip (row + files), cascading its collection links.
+
+    The ONLY full-destroy entry point, so the safe-delete contract can't be
+    silently bypassed. Locks the clip row and queues file cleanup via
+    ``transaction.on_commit`` so a surrounding rollback can never leave bytes
+    deleted while the row survives. Requires a row-locking backend (PostgreSQL).
+
+    Idempotent: if the row is already gone — e.g. a concurrent destroy committed
+    first while we waited on the lock — this no-ops instead of raising (mirrors
+    ``delete_clip_in_collection``), so a double-submit can't surface as a 500.
+    """
+    with transaction.atomic():
+        try:
+            clip = Clip.objects.select_for_update().get(pk=clip.pk)
+        except Clip.DoesNotExist:
+            return  # already destroyed by a concurrent caller — nothing to do
+        files = [clip.video_file, clip.converted_video_file, clip.thumbnail]
+        clip_id = clip.pk
+        clip.delete()  # cascades CollectionClip rows
+        cleanup_clip_files_on_commit(clip_id, files)
 
 
 def _extract_frame(video_path, out_path):

@@ -42,7 +42,7 @@ class Clip(models.Model):
     uploader = models.ForeignKey(User, on_delete=models.CASCADE)
 
     # Whether the clip appears in the public home feed. UNLISTED clips live only
-    # inside collections (or a direct link); access is gated by can_view (later step).
+    # inside collections (or a direct link); access is gated by is_viewable_by.
     visibility = models.CharField(
         max_length=10,
         choices=Visibility.choices,
@@ -60,3 +60,22 @@ class Clip(models.Model):
 
     def __str__(self):
         return self.title
+
+    def is_viewable_by(self, user):
+        """Whether ``user`` may view this clip (detail page / a listing entry).
+
+        PUBLIC clips are world-viewable. Otherwise the clip is restricted to its
+        uploader plus any access granted by feature apps that register a provider
+        via ``clips.access`` (e.g. an active collection member). This is the clip
+        layer owning its own visibility rule, with collections plugging in rather
+        than ``clips`` importing the higher-level feature.
+        """
+        if self.visibility == self.Visibility.PUBLIC:
+            return True
+        if not user.is_authenticated:
+            return False
+        if self.uploader_id == user.id:
+            return True
+        from clips.access import grants_view
+
+        return grants_view(self, user)

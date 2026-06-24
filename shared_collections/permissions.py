@@ -1,43 +1,38 @@
 """Authorization + destructive-action helpers for Collections.
 
-Single source of truth for "who may do what" and for the two destructive paths
-(safe in-collection delete, and full destroy). Views call these; templates gate
-buttons on the ``can_*`` predicates.
+Single source of truth for "who may do what" within a collection and for the
+safe in-collection delete. Views call these; templates gate buttons on the
+``can_*`` predicates. The base clip-visibility rule and the full-destroy path
+live on the ``clips`` side (``Clip.is_viewable_by`` and ``clips.services``);
+collections only *adds* an access grant (registered via ``clips.access``), so
+the dependency stays one-directional (feature → domain).
 
-Concurrency note: the destructive helpers lock the clip row with
-``select_for_update`` and queue file cleanup via ``transaction.on_commit`` so a
+Concurrency note: ``delete_clip_in_collection`` locks the clip row with
+``select_for_update`` and queues file cleanup via ``transaction.on_commit`` so a
 surrounding transaction's rollback can never leave bytes deleted while the row
-survives. They require a row-locking backend (PostgreSQL) — enforced at startup
+survives. It requires a row-locking backend (PostgreSQL) — enforced at startup
 by ``shared_collections.checks``.
 """
-
-import logging
 
 from django.db import transaction
 from django.db.models import Q
 
 from clips.models import Clip
+from clips.services import cleanup_clip_files_on_commit
 
 from .models import Collection, CollectionClip, CollectionMembership
 
-logger = logging.getLogger(__name__)
+# --- View-access provider -----------------------------------------------------
 
 
-# --- Predicates ---------------------------------------------------------------
+def grants_view_via_collection(clip, user):
+    """Whether ``user`` may view ``clip`` by virtue of a shared collection.
 
-
-def can_view(clip, user):
-    """Whether ``user`` may view ``clip`` (its detail page / a listing entry).
-
-    PUBLIC clips are world-viewable. UNLISTED clips are restricted to the
-    uploader or an active member (incl. owner) of a collection the clip is in.
+    Registered with ``clips.access`` (see ``SharedCollectionsConfig.ready``), so
+    ``Clip.is_viewable_by`` consults it for the restricted case. Only reached for
+    an authenticated, non-uploader user on a non-PUBLIC clip, so it just answers
+    "is this clip in a collection the user owns or is an active member of?".
     """
-    if clip.visibility == Clip.Visibility.PUBLIC:
-        return True
-    if not user.is_authenticated:
-        return False
-    if clip.uploader_id == user.id:
-        return True
     return CollectionClip.objects.filter(
         clip=clip,
         collection__in=Collection.objects.filter(
@@ -48,6 +43,9 @@ def can_view(clip, user):
             )
         ),
     ).exists()
+
+
+# --- Predicates ---------------------------------------------------------------
 
 
 def can_unlink(collection, user, clip):
@@ -85,43 +83,6 @@ def can_delete(collection, user, clip):
 # --- Destructive actions ------------------------------------------------------
 
 
-def _cleanup_files_on_commit(clip_id, files):
-    """Queue best-effort storage cleanup to run AFTER the outermost commit.
-
-    Never raises: the DB row is already gone, so a storage hiccup may orphan
-    files (the janitor job reclaims them) but must not resurrect the clip or
-    mask the caller's flow.
-    """
-
-    def cleanup():
-        for f in files:
-            if not f:
-                continue
-            try:
-                f.delete(save=False)
-            except Exception:
-                logger.exception(
-                    "shared_collections: orphaned media after clip delete (clip_id=%s)",
-                    clip_id,
-                )
-
-    transaction.on_commit(cleanup)
-
-
-def destroy_clip(clip):
-    """Fully destroy a clip (row + files), cascading its collection links.
-
-    The ONLY full-destroy entry point, so the safe-delete contract can't be
-    silently bypassed.
-    """
-    with transaction.atomic():
-        clip = Clip.objects.select_for_update().get(pk=clip.pk)
-        files = [clip.video_file, clip.converted_video_file, clip.thumbnail]
-        clip_id = clip.pk
-        clip.delete()  # cascades CollectionClip rows
-        _cleanup_files_on_commit(clip_id, files)
-
-
 def delete_clip_in_collection(collection, clip):
     """Safe delete: unlink ``clip`` from ``collection``; destroy only if it's the
     clip's sole home (not PUBLIC and not in any other collection).
@@ -149,4 +110,4 @@ def delete_clip_in_collection(collection, clip):
             files = [clip.video_file, clip.converted_video_file, clip.thumbnail]
             clip_id = clip.pk
             clip.delete()
-            _cleanup_files_on_commit(clip_id, files)
+            cleanup_clip_files_on_commit(clip_id, files)
