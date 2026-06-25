@@ -10,7 +10,7 @@
     </div>
 
     {% if collections %}
-        <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
             {% for collection in collections %}
                 <a href="{% url 'collection-detail' collection.pk %}"
                    class="card flex flex-col gap-2 p-5 transition-colors hover:border-flame-500">
