@@ -1,0 +1,68 @@
+# Continuous Integration: runs on every PR push and every push to main.
+# Mirrors the local dev commands exactly (ruff, makemigrations --check,
+# manage.py test) so a CI failure always reproduces locally and vice versa.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Pushing a new commit to the same branch cancels the now-obsolete older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Collections' shared_collections.E001 check fails closed on SQLite, so the
+    # suite needs real Postgres; this container matches the Postgres 18 used in dev.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zenkai_clip_share
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Stands in for the gitignored .env (django-environ falls back to real env
+    # vars). SECRET_KEY only ever signs sessions in the throwaway test database.
+    # SECURE_SSL_REDIRECT must be off: the test client speaks plain http, and
+    # shared_collections/tests.py doesn't override the redirect the way
+    # clips/users tests do.
+    env:
+      DEBUG: "False"
+      SECRET_KEY: ci-only-throwaway-key-not-a-secret
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/zenkai_clip_share
+      USE_S3: "False"
+      SECURE_SSL_REDIRECT: "False"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff check)
+        run: ruff check .
+
+      - name: Format check (ruff format)
+        run: ruff format --check .
+
+      - name: Missing-migration check
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Tests
+        run: python manage.py test
