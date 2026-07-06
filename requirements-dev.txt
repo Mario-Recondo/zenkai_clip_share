@@ -3,7 +3,7 @@
 -r requirements.txt
 
 # Linter + formatter (replaces flake8/isort/black/pyupgrade).
-ruff==0.15.17
+ruff==0.15.20
 
 # Git hook runner that drives Ruff on commit.
 pre-commit==4.6.0
