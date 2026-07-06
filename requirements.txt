@@ -3,7 +3,7 @@ Django==6.0.6
 
 # Media processing (calls the ffmpeg binary, which must be installed on the host)
 ffmpeg-python==0.2.0
-Pillow==12.1.1
+Pillow==12.3.0
 
 # Async task queue (Flaw #1). django-q2 uses the Django ORM as its broker,
 # so no Redis/RabbitMQ is required.
