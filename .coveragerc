@@ -1,0 +1,19 @@
+# Coverage.py configuration: measure only code we author.
+# Usage:  coverage run manage.py test && coverage report
+# For a browsable report with untested lines highlighted:  coverage html
+[run]
+source =
+    clips
+    shared_collections
+    users
+    zenkai_clip_share
+
+omit =
+    */migrations/*
+    */tests.py
+    zenkai_clip_share/asgi.py
+    zenkai_clip_share/wsgi.py
+
+[report]
+# List the line numbers each file is missing, not just percentages.
+show_missing = True
