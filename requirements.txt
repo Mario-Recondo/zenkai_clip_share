@@ -7,7 +7,7 @@ Pillow==12.1.1
 
 # Async task queue (Flaw #1). django-q2 uses the Django ORM as its broker,
 # so no Redis/RabbitMQ is required.
-django-q2==1.8.0
+django-q2==1.10.0
 
 # Object storage (Flaw #3). django-storages speaks the S3 API, which
 # Cloudflare R2 / AWS S3 / MinIO all implement.
