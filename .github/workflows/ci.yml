@@ -64,5 +64,13 @@ jobs:
       - name: Missing-migration check
         run: python manage.py makemigrations --check --dry-run
 
-      - name: Tests
-        run: python manage.py test
+      - name: Tests (under coverage)
+        run: coverage run manage.py test
+
+      # Informational only — never fails the build. The table lands on the
+      # run's Summary page; the gaps guide where to write the next test.
+      - name: Coverage report
+        run: |
+          coverage report
+          echo "## Coverage" >> "$GITHUB_STEP_SUMMARY"
+          coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
