@@ -1,0 +1,21 @@
+# Dependabot: automated dependency update PRs. Security-fix PRs are always on
+# and ignore the schedule below; `interval: weekly` only paces the routine
+# "a newer version exists" PRs. Every PR it opens runs through CI like any other.
+version: 2
+updates:
+  # Python packages (requirements.txt + requirements-dev.txt at the repo root).
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  # The building blocks used inside .github/workflows/*.yml
+  # (actions/checkout, actions/setup-python, ...).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
