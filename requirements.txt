@@ -19,4 +19,4 @@ django-environ==0.12.0
 
 # Production server + Postgres driver (used on the Oracle box; dev stays on SQLite)
 gunicorn==23.0.0
-psycopg[binary]==3.2.10
+psycopg[binary]==3.3.4
