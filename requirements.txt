@@ -15,7 +15,7 @@ django-storages==1.14.6
 boto3==1.40.0
 
 # 12-factor configuration (Flaw #2)
-django-environ==0.12.0
+django-environ==0.14.0
 
 # Production server + Postgres driver (used on the Oracle box; dev stays on SQLite)
 gunicorn==26.0.0
