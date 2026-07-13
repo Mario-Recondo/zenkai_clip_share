@@ -10,4 +10,4 @@ pre-commit==4.6.0
 
 # Test coverage measurement: `coverage run manage.py test` then `coverage report`
 # (or `coverage html` for a browsable line-by-line view). Config in .coveragerc.
-coverage==7.15.0
+coverage==7.15.1
