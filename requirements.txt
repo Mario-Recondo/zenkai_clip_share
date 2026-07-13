@@ -1,5 +1,5 @@
 # Core
-Django==6.0.6
+Django==6.0.7
 
 # Media processing (calls the ffmpeg binary, which must be installed on the host)
 ffmpeg-python==0.2.0
